@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Omnimed — Header patient</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #f4f4f4; font-family: 'Inter', sans-serif; min-height: 100%; }
+  * { box-sizing: border-box; }
+  .page {
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+    background: #f4f4f4;
+    min-height: 100vh;
+  }
+  .stage { width: 100%; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(166, 167, 229, 0.8); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<script type="text/babel">
+const { useState } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "width": 1110,
+  "expanded": false,
+  "patientName": "Jean-François Bouchard-Tremblay",
+  "doctorName": "Dre A. Tremblay"
+}/*EDITMODE-END*/;
+
+function PatientHeaderStandalone({ name, sub, expanded, doctorName, onToggle }) {
+  return (
+    <div style={phStyles.card}>
+      <div style={phStyles.row}>
+        <div style={phStyles.avatar}>
+          <span className="material-icons" style={{ color: "#8a5cb8", fontSize: 18 }}>person</span>
+        </div>
+        <div style={phStyles.ident}>
+          <div style={phStyles.name}>{name}</div>
+          <div style={phStyles.sub}>{sub}</div>
+          <div style={phStyles.ramq}>RAMQ : BOUJ 0110 1234</div>
+        </div>
+
+        {expanded && (
+          <>
+            <div style={phStyles.midCol}>
+              <InfoRow icon="phone" text="(514) 555-0184" />
+              <InfoRow icon="mail_outline" text="jf.bouchard@example.ca" />
+              <InfoRow icon="home" text="2845 rue Saint-Denis, Montréal, QC  H2X 3L7" />
+            </div>
+
+            <div style={phStyles.midCol}>
+              <InfoRow icon="medical_services" text={`${doctorName} (méd. famille)`} />
+              <InfoRow icon="local_pharmacy" text="Pharmacie Jean Coutu — Plateau" />
+              <InfoRow icon="contact_emergency" text="Marie-Claude Bouchard (mère)" />
+            </div>
+          </>
+        )}
+
+        {!expanded && (
+          <div style={phStyles.collapsedMeta}>
+            <InfoChip icon="phone" text="(514) 555-0184" />
+            <InfoChip icon="medical_services" text={doctorName} />
+          </div>
+        )}
+
+        <div style={phStyles.actions}>
+          <IconBtn icon="local_hospital" />
+          <IconBtn icon="article" />
+          <IconBtn
+            icon={expanded ? "keyboard_arrow_up" : "keyboard_arrow_down"}
+            chevron
+            onClick={onToggle}
+            ariaLabel={expanded ? "Réduire" : "Développer"}
+          />
+        </div>
+      </div>
+
+      <div style={phStyles.warnRow}>
+        <div style={{ flex: 1 }} />
+        <button style={phStyles.warnBtn}>
+          <span className="material-icons" style={{ fontSize: 16, color: "#fff" }}>front_hand</span>
+          <span>Accès limité au dossier</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({ icon, text }) {
+  return (
+    <div style={phStyles.infoRow}>
+      <span className="material-icons-outlined" style={phStyles.infoIcon}>{icon}</span>
+      <span style={phStyles.infoText}>{text}</span>
+    </div>
+  );
+}
+
+function InfoChip({ icon, text }) {
+  return (
+    <div style={phStyles.chip}>
+      <span className="material-icons-outlined" style={phStyles.chipIcon}>{icon}</span>
+      <span style={phStyles.chipText}>{text}</span>
+    </div>
+  );
+}
+
+function IconBtn({ icon, chevron, onClick, ariaLabel }) {
+  return (
+    <button style={phStyles.iconBtn} onClick={onClick} aria-label={ariaLabel}>
+      <span className="material-icons" style={{ color: chevron ? "#1975d1" : "rgba(0,0,0,0.68)", fontSize: 20 }}>
+        {icon}
+      </span>
+    </button>
+  );
+}
+
+const phStyles = {
+  card: {
+    background: "#fff", borderRadius: 4, position: "relative",
+    boxShadow: "0 2px 4px 0 rgba(37,36,94,.14), 0 0 5px 0 rgba(37,36,94,.12)",
+    fontFamily: "'Inter', sans-serif",
+    padding: "14px 20px 12px",
+  },
+  row: { display: "flex", alignItems: "flex-start", gap: 16 },
+  avatar: {
+    width: 30, height: 30, borderRadius: "50%", background: "#e8e0f2",
+    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+    marginTop: 2,
+  },
+  ident: { width: 240, flexShrink: 0 },
+  name: {
+    fontFamily: "'Poppins',sans-serif", fontWeight: 600, fontSize: 14,
+    color: "rgba(0,0,0,0.87)",
+  },
+  sub: { fontSize: 12, color: "rgba(0,0,0,0.54)", marginTop: 2 },
+  ramq: {
+    fontSize: 12, color: "rgba(0,0,0,0.68)", marginTop: 6,
+    fontVariantNumeric: "tabular-nums",
+  },
+  midCol: {
+    display: "flex", flexDirection: "column", gap: 8,
+    paddingTop: 4, minWidth: 200, flex: 1,
+  },
+  collapsedMeta: {
+    flex: 1, display: "flex", alignItems: "center", gap: 10,
+    paddingTop: 4, flexWrap: "wrap",
+  },
+  chip: {
+    display: "inline-flex", alignItems: "center", gap: 6,
+    background: "rgba(0,0,0,0.04)", border: "1px solid #e0e0e0",
+    borderRadius: 16, padding: "3px 10px",
+  },
+  chipIcon: { fontSize: 14, color: "rgba(0,0,0,0.54)" },
+  chipText: { fontSize: 12, color: "rgba(0,0,0,0.78)" },
+  infoRow: { display: "flex", alignItems: "center", gap: 8 },
+  infoIcon: { fontSize: 18, color: "rgba(0,0,0,0.54)", width: 20, flexShrink: 0 },
+  infoText: { fontSize: 13, color: "rgba(0,0,0,0.78)" },
+  actions: {
+    display: "flex", alignItems: "center", gap: 6,
+    padding: "4px 6px",
+  },
+  iconBtn: {
+    width: 34, height: 34, border: 0, borderRadius: 4,
+    background: "transparent", cursor: "pointer",
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    transition: "background 0.15s",
+  },
+  warnRow: {
+    display: "flex", alignItems: "center", marginTop: -28,
+    paddingBottom: 0,
+  },
+  warnBtn: {
+    display: "inline-flex", alignItems: "center", gap: 8,
+    background: "#b00020", color: "#fff", border: 0, cursor: "pointer",
+    padding: "6px 14px", borderRadius: 9999,
+    fontFamily: "'Inter',sans-serif", fontWeight: 500, fontSize: 13,
+  },
+};
+
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  // Local UI state for the in-header chevron — initialized from the tweak,
+  // but the user can also click the chevron in the header to toggle.
+  const [expanded, setExpanded] = useState(tweaks.expanded);
+  React.useEffect(() => { setExpanded(tweaks.expanded); }, [tweaks.expanded]);
+
+  const handleToggle = () => {
+    const next = !expanded;
+    setExpanded(next);
+    setTweak("expanded", next);
+  };
+
+  return (
+    <div className="page">
+      <div className="stage" style={{ maxWidth: tweaks.width }}>
+        <PatientHeaderStandalone
+          name={tweaks.patientName}
+          sub="Homme de 24 ans, né le 10 oct. 2001"
+          doctorName={tweaks.doctorName}
+          expanded={expanded}
+          onToggle={handleToggle}
+        />
+      </div>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Mise en page">
+          <TweakSlider
+            label="Largeur"
+            value={tweaks.width}
+            onChange={(v) => setTweak("width", v)}
+            min={600}
+            max={1600}
+            step={10}
+            unit="px"
+          />
+          <TweakToggle
+            label="Développé"
+            value={tweaks.expanded}
+            onChange={(v) => setTweak("expanded", v)}
+          />
+        </TweakSection>
+        <TweakSection title="Identité">
+          <TweakText
+            label="Nom du patient"
+            value={tweaks.patientName}
+            onChange={(v) => setTweak("patientName", v)}
+            placeholder="Prénom Nom"
+          />
+          <TweakText
+            label="Médecin de famille"
+            value={tweaks.doctorName}
+            onChange={(v) => setTweak("doctorName", v)}
+            placeholder="Dr/Dre P. Nom"
+          />
+        </TweakSection>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

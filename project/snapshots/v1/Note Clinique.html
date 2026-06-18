@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Omnimed — Note clinique</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #eef0f3; font-family: 'Inter', sans-serif; height: 100%; }
+  * { box-sizing: border-box; }
+  #root { height: 100vh; overflow: auto; }
+  .app { display: flex; flex-direction: column; height: 100vh; min-width: 1180px; background: #f4f5f7; overflow: hidden; }
+  .main-row { display: flex; flex: 1; min-height: 0; }
+  .content {
+    flex: 1;
+    padding: 16px;
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    min-width: 0;
+    overflow: hidden;
+    background: #f4f5f7;
+    align-items: flex-start;
+  }
+  .center-col {
+    flex: 1;
+    min-width: 520px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    height: 100%;
+    padding-bottom: 16px;
+  }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: rgba(166, 167, 229, 0.7); border-radius: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="note-ui/TopBar.jsx"></script>
+<script type="text/babel" src="note-ui/SideNav.jsx"></script>
+<script type="text/babel" src="note-ui/PatientBanner.jsx"></script>
+<script type="text/babel" src="note-ui/NoteEditor.jsx"></script>
+<script type="text/babel" src="note-ui/NotesList.jsx"></script>
+<script type="text/babel" src="note-ui/Summary.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "doctorName": "Véronique Charland"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  return (
+    <div className="app">
+      <TopBar user={t.doctorName} />
+      <div className="main-row">
+        <SideNav />
+        <div className="content">
+          <div className="center-col">
+            <PatientBanner />
+            <NoteEditor />
+            <NotesList doctorName={t.doctorName} />
+          </div>
+          <Summary />
+        </div>
+      </div>
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Médecin" />
+        <TweakText label="Nom du médecin" value={t.doctorName} onChange={(v) => setTweak("doctorName", v)} />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

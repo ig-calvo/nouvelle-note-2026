@@ -1,0 +1,265 @@
+/* =============================================================
+   Omnimed DS2 — Colors & Typography Tokens
+   Source of truth: extracted from the live Omnimed DS2 CSS
+   (see source-extracts/ for the originals).
+   ============================================================= */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap");
+
+:root {
+  /* ------------------------------------------------------------
+     COLOR — brand / primary (navy/indigo scale)
+     ------------------------------------------------------------ */
+  --omd-primary-50:  #eaeaf9;   /* search input fill, tint */
+  --omd-primary-100: #c9c9ef;
+  --omd-primary-200: #a6a7e5;
+  --omd-primary-300: #6c7fdf;
+  --omd-primary-400: #6967d1;
+  --omd-primary-500: #1975d1;   /* interactive blue (action) */
+  --omd-primary-600: #4c4ab2;
+  --omd-primary-700: #3c359a;
+  --omd-primary-800: #2f2285;
+  --omd-primary-900: #25245e;   /* top nav bar */
+
+  /* ------------------------------------------------------------
+     COLOR — action / interactive
+     ------------------------------------------------------------ */
+  --omd-action-700:          #1975d1;
+  --omd-action-contrast-700: #ffffff;
+  --omd-link:                #1975d1;
+
+  /* ------------------------------------------------------------
+     COLOR — semantic
+     ------------------------------------------------------------ */
+  --omd-error-700:   #b00020;   /* renewals badge, stop button */
+  --omd-success:     #39ab49;
+  --omd-warning:     #ffdd49;
+
+  /* ------------------------------------------------------------
+     COLOR — surface / background
+     ------------------------------------------------------------ */
+  --omd-surface-white:        #ffffff;
+  --omd-surface-offwhite:     #fbfbfb;  /* patient header iframe band */
+  --omd-surface-light:        #f4f4f4;  /* sidebar, page */
+  --omd-surface-elevated:     #fafafa;  /* mat-app bg */
+  --omd-surface-input-bg:     #eaeaf9;  /* header search fill */
+  --omd-surface-action-light: #f4f6fb;  /* icon button default */
+
+  /* record summary right panel */
+  --omd-summary-header-bg:   #41478d;
+  --omd-summary-header-text: #ffffff;
+
+  /* ------------------------------------------------------------
+     COLOR — borders
+     ------------------------------------------------------------ */
+  --omd-border-default: #e8e8e8;
+  --omd-border-input:   #cccccc;
+  --omd-border-search:  #23245c;
+  --omd-border-divider: rgba(0, 0, 0, 0.12);
+
+  /* ------------------------------------------------------------
+     COLOR — text
+     ------------------------------------------------------------ */
+  --omd-text-high:           rgba(0, 0, 0, 0.87);   /* body */
+  --omd-text-primary-dark:   #232428;               /* patient name, headings */
+  --omd-text-medium:         rgba(0, 0, 0, 0.54);
+  --omd-text-low:            rgba(0, 0, 0, 0.38);   /* disabled */
+  --omd-text-born-on:        rgba(35, 36, 40, 0.68);
+  --omd-text-on-dark:        #ffffff;
+  --omd-text-on-dark-medium: rgba(255, 255, 255, 0.74);
+  --omd-text-on-dark-low:    rgba(255, 255, 255, 0.38);
+  --omd-text-legacy-dark:    #333333;               /* legacy JSF nav */
+  --omd-text-search-input:   #2d2381;
+
+  /* ------------------------------------------------------------
+     SPACING  (ds-spacing-* token names preserved)
+     ------------------------------------------------------------ */
+  --omd-spacing-xxs: 4px;
+  --omd-spacing-xs:  8px;
+  --omd-spacing-12:  12px;
+  --omd-spacing-s:   16px;
+  --omd-spacing-m:   24px;
+  --omd-spacing-l:   32px;
+  --omd-spacing-xl:  48px;
+
+  /* ------------------------------------------------------------
+     RADIUS
+     ------------------------------------------------------------ */
+  --omd-radius-none:      0;
+  --omd-radius-xs:        2px;
+  --omd-radius-s:         4px;
+  --omd-radius-m:         8px;
+  --omd-radius-full-top:  8px 8px 0 0;
+  --omd-radius-badge:     9px;
+  --omd-radius-circle:    50%;
+  --omd-radius-pill:      48px;
+  --omd-radius-full:      9999999px;
+
+  /* ------------------------------------------------------------
+     ELEVATION — brand-tinted navy shadows (not grey!)
+     ------------------------------------------------------------ */
+  --omd-shadow-card:
+      0 2px 4px 0 rgba(37, 36, 94, 0.14),
+      0 0 5px 0 rgba(37, 36, 94, 0.12);
+  --omd-shadow-card-list:
+      0 2px 8px 2px rgba(37, 36, 94, 0.14);
+  --omd-shadow-help-panel:
+      0 8px 12px -2px rgba(37, 36, 94, 0.14),
+      0 0 4px 0 rgba(37, 36, 94, 0.12);
+  --omd-shadow-top-nav:
+      0 6px 10px rgba(0, 0, 0, 0.14),
+      0 1px 18px rgba(0, 0, 0, 0.12),
+      0 3px 5px rgba(0, 0, 0, 0.2);
+
+  /* ------------------------------------------------------------
+     LAYOUT
+     ------------------------------------------------------------ */
+  --omd-top-nav-height: 40px;
+  --omd-sidebar-width:  237px;
+  --omd-right-panel-w:  240px;
+  --omd-z-top-nav:      40;
+  --omd-z-dialog:       1300;
+  --omd-z-tooltip:      1500;
+
+  /* ------------------------------------------------------------
+     TYPE — fonts
+     ------------------------------------------------------------ */
+  --omd-font-heading: 'Poppins', 'Inter', system-ui, -apple-system, sans-serif;
+  --omd-font-body:    'Inter',   'Roboto', system-ui, -apple-system, sans-serif;
+  --omd-font-legacy:  'Roboto',  'Inter',  system-ui, -apple-system, sans-serif;
+
+  /* TYPE — size scale */
+  --omd-fs-11: 11px;
+  --omd-fs-12: 12px;
+  --omd-fs-13: 13px;
+  --omd-fs-14: 14px;   /* default body */
+  --omd-fs-16: 16px;
+  --omd-fs-20: 20px;
+  --omd-fs-24: 24px;
+}
+
+/* =============================================================
+   SEMANTIC TYPE CLASSES
+   These mirror the shipped .ds-* and .subtitle-* classes.
+   ============================================================= */
+
+.omd-headline-5 {
+  font-family: var(--omd-font-heading);
+  font-size: var(--omd-fs-24);
+  font-weight: 400;
+  letter-spacing: 0.18px;
+  line-height: 30px;
+  color: var(--omd-text-high);
+}
+
+.omd-headline-6 {
+  font-family: var(--omd-font-heading);
+  font-size: var(--omd-fs-20);
+  font-weight: 500;
+  letter-spacing: 0.15px;
+  line-height: 30px;
+  color: var(--omd-text-high);
+}
+
+.omd-subtitle-1 {
+  font-family: var(--omd-font-heading);
+  font-size: var(--omd-fs-16);
+  font-weight: 400;
+  letter-spacing: 0.15px;
+  line-height: 24px;
+  color: var(--omd-text-high);
+}
+
+.omd-subtitle-2 {
+  font-family: var(--omd-font-heading);
+  font-size: var(--omd-fs-14);
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  line-height: 24px;
+  color: var(--omd-text-primary-dark);
+}
+
+.omd-body-1 {
+  font-family: var(--omd-font-body);
+  font-size: var(--omd-fs-16);
+  font-weight: 400;
+  letter-spacing: 0.2px;
+  line-height: 150%;
+  color: var(--omd-text-high);
+}
+
+.omd-body-1-semi-bold {
+  font-family: var(--omd-font-body);
+  font-size: var(--omd-fs-16);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  line-height: 150%;
+  color: var(--omd-text-high);
+}
+
+.omd-body-2 {
+  font-family: var(--omd-font-body);
+  font-size: var(--omd-fs-14);
+  font-weight: 400;
+  letter-spacing: 0.2px;
+  line-height: 150%;
+  color: var(--omd-text-high);
+}
+
+.omd-body-2-semi-bold {
+  font-family: var(--omd-font-body);
+  font-size: var(--omd-fs-14);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  line-height: 150%;
+  color: var(--omd-text-high);
+}
+
+.omd-body-3 {
+  font-family: var(--omd-font-body);
+  font-size: var(--omd-fs-12);
+  font-weight: 400;
+  letter-spacing: 0.25px;
+  line-height: 150%;
+  color: var(--omd-text-high);
+}
+
+.omd-body-3-semi-bold {
+  font-family: var(--omd-font-body);
+  font-size: var(--omd-fs-12);
+  font-weight: 600;
+  letter-spacing: 0.25px;
+  line-height: 150%;
+  color: var(--omd-text-high);
+}
+
+.omd-caption {
+  font-family: var(--omd-font-body);
+  font-size: var(--omd-fs-12);
+  font-weight: 400;
+  letter-spacing: 0.4px;
+  line-height: 16px;
+  color: var(--omd-text-medium);
+}
+
+.omd-overline {
+  font-family: var(--omd-font-heading);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  line-height: 16px;
+  text-transform: uppercase;
+  color: var(--omd-text-medium);
+}
+
+.omd-button-text {
+  font-family: var(--omd-font-heading);
+  font-size: var(--omd-fs-14);
+  font-weight: 500;
+  letter-spacing: 1.25px;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.omd-hyperlink { color: var(--omd-link); }
+.omd-hyperlink:hover { text-decoration: underline; }

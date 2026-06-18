@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "prototypes",
+      "runtimeExecutable": "/usr/bin/python3",
+      "runtimeArgs": [
+        "/Users/ignaciocalvo/prototype-test-nouvelle-note-2026/.claude/serve.py"
+      ],
+      "port": 8000
+    }
+  ]
+}

@@ -1,0 +1,213 @@
+/* ============================================================
+   Clinical tool (Outil clinique) — scoped styles
+   Reworked to match the Omnimed clinical-tool screenshot:
+   flat white chrome, hairline section dividers (no cards),
+   muted medical-blue accent, light underline fields,
+   outlined Oui/Non toggles.
+   ============================================================ */
+
+:root {
+  --ct-blue: #1975d1;
+  --ct-blue-soft: #e8f1fb;
+  --ct-red: #e0356b;
+  --ct-ink: #2b2f36;
+  --ct-slate: #3a3f47;
+  --ct-muted: #6b7079;
+  --ct-line: #e3e5ea;
+  --ct-line-strong: #cfd2d8;
+}
+
+.ct-panel {
+  margin-top: 14px;
+  border: 1px solid var(--ct-line);
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--elev-1);
+  overflow: hidden;
+  font-family: var(--font-body);
+  color: var(--ct-ink);
+  animation: note-expand 260ms var(--motion-ease);
+}
+
+/* ---- Top bar -------------------------------------------------- */
+.ct-bar {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid var(--ct-line);
+}
+.ct-bar__wrench {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ct-muted);
+}
+.ct-bar__wrench .material-icons-outlined { font-size: 18px; }
+.ct-bar__txt { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.ct-bar__overline {
+  font-size: 11px; font-weight: 500; color: var(--ct-muted);
+}
+.ct-bar__title {
+  font-family: var(--font-body);
+  font-weight: 600; font-size: 14.5px; color: var(--ct-blue);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ct-bar__actions { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.ct-iconbtn {
+  width: 30px; height: 30px; border: 0; background: transparent;
+  border-radius: 6px; cursor: pointer; color: var(--ct-blue);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background 120ms;
+}
+.ct-iconbtn .material-icons-outlined,
+.ct-iconbtn .material-icons { font-size: 19px; }
+.ct-iconbtn:hover { background: rgba(25,117,209,0.10); }
+.ct-iconbtn.is-fav { color: var(--ct-red); }
+.ct-iconbtn.is-fav:hover { background: rgba(224,53,107,0.10); }
+
+/* ---- Body / scaffold ------------------------------------------ */
+.ct-body { padding: 14px 18px 18px; }
+.ct-effrow {
+  display: flex; align-items: flex-end; gap: 10px;
+  margin-bottom: 6px;
+}
+.ct-effrow .ct-field { max-width: 190px; }
+.ct-doctitle {
+  text-align: center; font-family: var(--font-body);
+  font-weight: 600; font-size: 12px; letter-spacing: 0.4px;
+  text-transform: uppercase; color: var(--ct-muted);
+  margin: 14px 0 4px;
+}
+
+/* ---- Section (hairline divider, no card) ---------------------- */
+.ct-sec { border-top: 1px solid var(--ct-line); }
+.ct-sec:first-of-type { border-top: 0; }
+.ct-sec__hd {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 12px 2px; border: 0; cursor: pointer;
+  background: transparent; font-family: var(--font-body); text-align: left;
+}
+.ct-sec__chev {
+  font-size: 19px !important; color: var(--ct-muted);
+  transition: transform 180ms var(--motion-ease);
+}
+.ct-sec.is-collapsed .ct-sec__chev { transform: rotate(-90deg); }
+.ct-sec__name {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+  text-transform: uppercase; color: var(--ct-slate);
+}
+.ct-sec__bd { padding: 2px 2px 18px; }
+.ct-sec.is-collapsed .ct-sec__bd { display: none; }
+
+/* ---- Fields (underline style) --------------------------------- */
+.ct-grid { display: grid; gap: 16px 26px; margin-bottom: 16px; }
+.ct-grid:last-child { margin-bottom: 0; }
+.ct-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ct-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ct-span2 { grid-column: span 2; }
+.ct-span3 { grid-column: 1 / -1; }
+
+.ct-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ct-field > label { font-size: 12px; color: var(--ct-muted); font-weight: 400; }
+.ct-field input,
+.ct-field select {
+  border: 0; border-bottom: 1px solid var(--ct-line-strong);
+  background: transparent; padding: 4px 2px; font-size: 13px;
+  font-family: var(--font-body); color: var(--ct-ink); outline: none;
+  width: 100%; transition: border-color 140ms, box-shadow 140ms;
+}
+.ct-field select { cursor: pointer; appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='20'%20height='20'%20viewBox='0%200%2024%2024'%20fill='%236b7079'%3E%3Cpath%20d='M7%2010l5%205%205-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 0 center; padding-right: 20px;
+}
+.ct-field input:focus,
+.ct-field select:focus { border-bottom-color: var(--ct-blue); box-shadow: 0 1px 0 0 var(--ct-blue); }
+.ct-field input::placeholder { color: #aeb2ba; }
+
+/* ---- Sub-labels & notes --------------------------------------- */
+.ct-sub {
+  font-size: 12.5px; font-weight: 700; color: var(--ct-slate);
+  margin: 2px 0 10px; text-decoration: underline; text-underline-offset: 3px;
+}
+.ct-sub--plain { text-decoration: none; font-weight: 600; }
+.ct-note { font-size: 11.5px; line-height: 1.5; color: var(--ct-muted); margin: 10px 0; }
+.ct-note strong { color: var(--ct-ink); font-weight: 700; }
+.ct-note--ital { font-style: italic; }
+.ct-link { color: var(--ct-blue); text-decoration: underline; cursor: pointer; }
+
+/* ---- Checkboxes ----------------------------------------------- */
+.ct-checks { display: grid; gap: 13px 26px; margin: 8px 0 6px; }
+.ct-checks--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ct-checks--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ct-checks--1 { grid-template-columns: 1fr; }
+.ct-check {
+  display: flex; align-items: flex-start; gap: 9px;
+  font-size: 12.5px; line-height: 1.45; color: var(--ct-ink); cursor: pointer;
+}
+.ct-check input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none;
+  width: 16px; height: 16px; flex-shrink: 0; margin: 1px 0 0;
+  border: 1.5px solid var(--ct-line-strong); border-radius: 3px;
+  background: #fff; cursor: pointer; position: relative;
+  transition: background 120ms, border-color 120ms;
+}
+.ct-check input[type="checkbox"]:checked { background: var(--ct-blue); border-color: var(--ct-blue); }
+.ct-check input[type="checkbox"]:checked::after {
+  content: ""; position: absolute; left: 4.5px; top: 1.5px;
+  width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* ---- Yes/No + segmented choices (outlined) -------------------- */
+.ct-qgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 32px; }
+.ct-qrow { display: flex; align-items: center; gap: 14px; }
+.ct-qrow__lbl { flex: 1; font-size: 12px; line-height: 1.4; color: var(--ct-ink); }
+.ct-seg { display: inline-flex; flex-shrink: 0; border: 1px solid var(--ct-line-strong); border-radius: 6px; overflow: hidden; }
+.ct-seg button {
+  border: 0; background: #fff; cursor: pointer; padding: 5px 14px;
+  font-size: 12px; font-weight: 600; font-family: var(--font-body);
+  color: var(--ct-ink); transition: background 120ms, color 120ms;
+}
+.ct-seg button + button { border-left: 1px solid var(--ct-line-strong); }
+.ct-seg button.is-on { background: var(--ct-blue-soft); color: var(--ct-blue); }
+
+.ct-inline-q { display: flex; align-items: center; gap: 10px; }
+.ct-inline-q > span { font-size: 12px; color: var(--ct-ink); }
+
+/* ---- Drag-to-place -------------------------------------------- */
+.ct-drag { border: 0; background: transparent; cursor: grab; color: var(--ct-muted); display: inline-flex; align-items: center; padding: 0; margin-right: 2px; }
+.ct-drag:active { cursor: grabbing; }
+.ct-drag .material-icons-outlined { font-size: 18px; }
+.ct-panel.is-dragging { opacity: 0.55; }
+.ct-dropline { position: absolute; left: 0; right: 0; height: 0; border-top: 2px solid var(--ct-blue); margin-top: -1px; pointer-events: none; z-index: 6; }
+.ct-dropline::before { content: ""; position: absolute; left: -3px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--ct-blue); }
+.ct-default-zone { border-radius: 8px; transition: background 130ms; }
+.ct-default-zone.is-target { background: var(--ct-blue-soft); outline: 2px dashed var(--ct-blue); outline-offset: 3px; }
+
+/* Compact the split text editors so the tool sits snug between paragraphs */
+[data-field-id="detail-top"], [data-field-id="detail-bot"],
+[data-field-id="conclusion-top"], [data-field-id="conclusion-bot"] { min-height: 0 !important; }
+[data-field-id="detail-top"] .ql-editor, [data-field-id="detail-bot"] .ql-editor,
+[data-field-id="conclusion-top"] .ql-editor, [data-field-id="conclusion-bot"] .ql-editor { min-height: 0 !important; padding-top: 2px !important; padding-bottom: 2px !important; }
+
+/* ---- Tool chips (note tools row restyle) ---------------------- */
+.ct-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--divider); border-radius: 999px;
+  padding: 6px 14px 6px 11px; cursor: pointer; white-space: nowrap;
+  font: 600 12.5px var(--font-body); color: var(--brand-primary);
+  background: var(--brand-primary-container); flex-shrink: 0;
+  transition: background 130ms, border-color 130ms, box-shadow 130ms;
+}
+.ct-chip .material-icons-outlined { font-size: 15px; }
+.ct-chip:hover { background: rgb(222,221,255); border-color: var(--brand-primary); }
+.ct-chip.is-active { background: var(--brand-primary); border-color: var(--brand-primary); color: #fff; box-shadow: var(--elev-1); }
+.ct-toolsbtn {
+  width: 34px; height: 34px; flex-shrink: 0; cursor: pointer;
+  border: 1px solid var(--divider); border-radius: 9px; background: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--brand-primary); transition: background 130ms;
+}
+.ct-toolsbtn:hover { background: var(--brand-primary-container); }
+.ct-toolsbtn .material-icons-outlined { font-size: 18px; }

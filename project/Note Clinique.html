@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Omnimed — Note clinique</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+<link rel="stylesheet" href="note-ui/editor.css">
+<link rel="stylesheet" href="note-ui/clinical-tool.css">
+<link rel="stylesheet" href="colors_and_type.css">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined" rel="stylesheet">
+<style>
+  /* DS3 token bridge — needed by editor components */
+  :root {
+    --brand-primary: rgb(46, 56, 166);
+    --brand-primary-hover: rgb(41, 52, 166);
+    --brand-primary-container: rgb(229, 226, 243);
+    --surface-2: #fff;
+    --surface-1: rgb(252,252,253);
+    --fg-1: rgb(13,13,26);
+    --fg-2: rgb(50,49,53);
+    --fg-3: rgb(74,73,80);
+    --fg-4: rgb(107,107,107);
+    --bg-alt: rgb(250,250,252);
+    --bg-subtle: rgb(245,245,250);
+    --border-default: rgb(180,180,180);
+    --border-subtle: rgb(217,217,217);
+    --divider: rgb(229,226,243);
+    --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+    --elev-1: 0 1px 2px 0 rgba(37,36,94,0.12);
+    --elev-2: 0 2px 6px -1px rgba(37,36,94,0.14), 0 1px 2px 0 rgba(37,36,94,0.12);
+    --elev-3: 0 6px 10px -2px rgba(37,36,94,0.16), 0 2px 4px 0 rgba(37,36,94,0.12);
+    --elev-4: 0 12px 20px -4px rgba(37,36,94,0.18), 0 4px 8px 0 rgba(37,36,94,0.12);
+    --font-body: 'Inter', sans-serif;
+    --font-display: 'Poppins', sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+    --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+  }
+  html, body { margin: 0; padding: 0; background: #eef0f3; font-family: 'Inter', sans-serif; height: 100%; }
+  * { box-sizing: border-box; }
+  #root { height: 100vh; overflow: auto; }
+  .app { display: flex; flex-direction: column; height: 100vh; min-width: 1180px; background: #f4f5f7; overflow: hidden; }
+  .main-row { display: flex; flex: 1; min-height: 0; }
+  .content {
+    flex: 1;
+    padding: 16px;
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    min-width: 0;
+    overflow: hidden;
+    background: #f4f5f7;
+    align-items: stretch;
+  }
+  .center-col {
+    flex: 1;
+    min-width: 520px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    height: 100%;
+    padding-bottom: 16px;
+    padding-right: 8px;
+  }
+  /* Note expansion animation */
+  @keyframes ftbar-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes ai-blink {
+    0%, 100% { opacity: 1; } 50% { opacity: 0.25; }
+  }
+  @keyframes ai-spin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes note-expand {
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .note-expand {
+    animation: note-expand 300ms ease-in-out;
+  }
+  /* Patient banner collapse animation */
+  @keyframes banner-collapse-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .banner-collapse {
+    animation: banner-collapse-in 300ms ease-in-out;
+  }
+  .note-footer {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    background: #fff;
+    border-top: 1px solid #e5e5ec;
+    z-index: 10;
+    min-height: 64px;
+    margin-top: auto;
+    box-shadow: 0 -4px 12px rgba(37,36,94,0.08);
+  }
+  [data-field-id="detail"] .ql-editor,
+  [data-field-id="conclusion"] .ql-editor {
+    min-height: 64px;
+    height: auto;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: rgba(166, 167, 229, 0.7); border-radius: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  @keyframes snm-fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes snm-pop { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<template id="__bundler_thumbnail">
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100" height="100" rx="20" fill="rgb(46,56,166)"/>
+  <text x="50" y="50" font-family="Georgia, serif" font-size="46" fill="#fff" text-anchor="middle" dominant-baseline="central">℞</text>
+</svg>
+</template>
+<div id="root"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="note-ui/TopBar.jsx"></script>
+<script type="text/babel" src="note-ui/SideNav.jsx"></script>
+<script type="text/babel" src="note-ui/PatientBanner.jsx"></script>
+<script type="text/babel" src="note-ui/editor-data.jsx"></script>
+<script type="text/babel" src="note-ui/editor-popover.jsx"></script>
+<script type="text/babel" src="note-ui/editor-field.jsx"></script>
+<script type="text/babel" src="note-ui/AIBox.jsx"></script>
+<script type="text/babel" src="note-ui/ClinicalTool.jsx"></script>
+<script type="text/babel" src="note-ui/ClinicalToolPicker.jsx"></script>
+<script type="text/babel" src="note-ui/NoteEditor.jsx"></script>
+<script type="text/babel" src="note-ui/NoteStartCards.jsx"></script>
+<script type="text/babel" src="note-ui/SmartNoteModal.jsx"></script>
+<script type="text/babel" src="note-ui/NotesList.jsx"></script>
+<script type="text/babel" src="note-ui/FloatingToolbar.jsx"></script>
+<script type="text/babel" src="note-ui/SummaryModals.jsx"></script>
+<script type="text/babel" src="note-ui/Summary.jsx"></script>
+
+<script type="text/babel">
+
+
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "doctorName": "Véronique Charland",
+  "rxChipSig": true
+} /*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [noteOpen, setNoteOpen] = React.useState(false);
+  const [bannerCollapsed, setBannerCollapsed] = React.useState(false);
+  const [smartModal, setSmartModal] = React.useState(false);
+  const [smartActive, setSmartActive] = React.useState(false);
+
+  React.useEffect(() => {
+    document.body.classList.toggle('hide-rx-sig', !t.rxChipSig);
+  }, [t.rxChipSig]);
+
+  function handleNoteOpen() {
+    if (noteOpen) return;
+    setNoteOpen(true);
+    setTimeout(() => setBannerCollapsed(true), 260);
+  }
+  function handlePick(key) {
+    if (key === 'intelligente') { setSmartModal(true); return; }
+    handleNoteOpen();
+  }
+  return (
+    <div className="app">
+      <TopBar user={t.doctorName} />
+      <div className="main-row">
+        <SideNav />
+        <div className="content">
+          <div className="center-col" style={{ padding: "0px 8px 0px 0px" }}>
+            <PatientBanner forceCollapsed={bannerCollapsed} />
+            <NoteEditor isOpen={noteOpen} onOpen={handleNoteOpen} smartActive={smartActive} />
+            <NotesList doctorName={t.doctorName} />
+            {noteOpen &&
+            <div className="note-footer" data-comment-anchor="c96d8d41d9-div-27-15" style={{ gap: "8px", borderRadius: "16px 16px 16px 1px", padding: "16px", height: "6px" }}>
+                <div style={{ display: 'flex', alignItems: 'center', background: '#e8e6f5', borderRadius: 999, padding: '5px 8px', gap: 4 }}>
+                  <button style={{ width: 38, height: 38, borderRadius: 999, background: '#5b54b8', border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 20, color: '#fff' }}>assignment</span>
+                  </button>
+                  <button style={{ width: 38, height: 38, borderRadius: 999, background: 'transparent', border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 20, color: '#5b54b8' }}>send</span>
+                  </button>
+                  <button style={{ width: 38, height: 38, borderRadius: 999, background: 'transparent', border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span className="material-icons-outlined" style={{ fontSize: 20, color: '#5b54b8' }}>list_alt</span>
+                  </button>
+                </div>
+                <div style={{ position: 'relative', marginLeft: 8 }}>
+                  <button style={{ background: 'none', border: 0, cursor: 'pointer', fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 16, color: '#25245E', padding: '4px 2px', letterSpacing: -0.5 }}>Rᴘ</button>
+                  <span style={{ position: 'absolute', top: -4, right: -10, width: 18, height: 18, background: '#1975d1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 700 }}>1</span>
+                </div>
+                <div style={{ flex: 1 }} />
+                <button style={{ border: '1px solid #d0d0e0', borderRadius: 8, background: '#eeeef8', padding: '9px 22px', cursor: 'pointer', font: "500 14px 'Inter',sans-serif", color: '#25245E' }}>Sauvegarder</button>
+                <button style={{ border: 0, borderRadius: 8, background: '#25245E', padding: '9px 24px', cursor: 'pointer', font: "600 14px 'Inter',sans-serif", color: '#fff' }}>Compléter</button>
+              </div>
+            }
+          </div>
+          <Summary />
+        </div>
+      </div>
+
+      <FloatingToolbar />
+      {smartModal &&
+        <SmartNoteModal
+          onCancel={() => setSmartModal(false)}
+          onConfirm={() => { setSmartModal(false); setSmartActive(true); handleNoteOpen(); }} />
+      }
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Médecin" />
+        <TweakText label="Nom du médecin" value={t.doctorName} onChange={(v) => setTweak("doctorName", v)} />
+        <TweakSection label="Prescriptions" />
+        <TweakToggle label="Posologie sur la puce Rx" value={t.rxChipSig} onChange={(v) => setTweak("rxChipSig", v)} />
+      </TweaksPanel>
+    </div>);
+
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
