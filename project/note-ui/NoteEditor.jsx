@@ -126,6 +126,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
     }
     if (entity.type === 'lab') return d.tests && d.tests[0] ? d.tests.join(', ').slice(0, 40) : entity.label;
     if (entity.type === 'imaging') return [d.modality, d.region].filter(Boolean).join(' ') || entity.label;
+    if (entity.type === 'referral') return d.specialty || entity.label;
     if (entity.type === 'problem') return d.name || entity.label;
     if (entity.type === 'instructions') return d.title || entity.label;
     return entity.label;
@@ -166,11 +167,14 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
       setLinkedChipId(chipId);
       return;
     }
-    // Zone click on prescription chip → inline autocomplete editor
-    if (extra && extra.field && chip && chip.entity && chip.entity.type === 'prescription') {
-      setInlineEdit({ chipId: chipId, field: extra.field, fieldRect: extra.fieldRect || rect });
-      setLinkedChipId(chipId);
-      return;
+    // Zone click → inline autocomplete editor (prescription, lab, imaging, referral)
+    if (extra && extra.field && chip && chip.entity) {
+      var editableTypes = ['prescription', 'lab', 'imaging', 'referral'];
+      if (editableTypes.indexOf(chip.entity.type) !== -1) {
+        setInlineEdit({ chipId: chipId, field: extra.field, fieldRect: extra.fieldRect || rect });
+        setLinkedChipId(chipId);
+        return;
+      }
     }
     // All other chips → full modal
     setPopover({ chipId: chipId, anchorRect: rect });
@@ -181,29 +185,45 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
     setChips(function(cs) {
       var c = cs[chipId]; if (!c) return cs;
       var details = Object.assign({}, c.entity.details || {});
-      if (field === 'dose') {
-        var dm = /^([\d.]+)\s*(mg|g|mcg|µg|mL|unités?|UI)$/i.exec(val.trim());
-        if (dm) { details.dose = dm[1]; details.unit = dm[2]; }
-        else { details.dose = val.replace(/[^0-9.]/g, '') || details.dose; }
-      } else if (field === 'frequency') {
-        details.frequency = val;
-      } else if (field === 'form_route') {
-        var frMap = {
-          '1 co PO': { form: 'comprimé', route: 'PO' }, '2 co PO': { form: 'comprimé', route: 'PO' },
-          '½ co PO': { form: 'comprimé', route: 'PO' }, '1 gél PO': { form: 'gélule', route: 'PO' },
-          '2 inh Inh': { form: 'aérosol-doseur', route: 'Inhalé' }, '1 amp SC': { form: 'ampoule', route: 'SC' },
-          '5 mL PO': { form: 'sirop', route: 'PO' }, '10 mL PO': { form: 'sirop', route: 'PO' }
-        };
-        var frm = frMap[val];
-        if (frm) { details.form = frm.form; details.route = frm.route; }
-      } else if (field === 'duration_refills') {
-        var drm = /^(\d+)\s*(jours?|semaines?|mois)(?:\s+R(\d+))?$/i.exec(val.trim());
-        if (drm) { details.duration = drm[1]; details.durationUnit = drm[2]; if (drm[3] !== undefined) details.refills = drm[3]; }
-        else if (/^long terme/i.test(val)) { details.duration = ''; details.durationUnit = ''; var rm = val.match(/R(\d+)/i); if (rm) details.refills = rm[1]; }
+      var type = c.entity.type;
+      if (type === 'prescription') {
+        if (field === 'dose') {
+          var dm = /^([\d.]+)\s*(mg|g|mcg|µg|mL|unités?|UI)$/i.exec(val.trim());
+          if (dm) { details.dose = dm[1]; details.unit = dm[2]; }
+          else { details.dose = val.replace(/[^0-9.]/g, '') || details.dose; }
+        } else if (field === 'frequency') {
+          details.frequency = val;
+        } else if (field === 'form_route') {
+          var frMap = {
+            '1 co PO': { form: 'comprimé', route: 'PO' }, '2 co PO': { form: 'comprimé', route: 'PO' },
+            '½ co PO': { form: 'comprimé', route: 'PO' }, '1 gél PO': { form: 'gélule', route: 'PO' },
+            '2 inh Inh': { form: 'aérosol-doseur', route: 'Inhalé' }, '1 amp SC': { form: 'ampoule', route: 'SC' },
+            '5 mL PO': { form: 'sirop', route: 'PO' }, '10 mL PO': { form: 'sirop', route: 'PO' }
+          };
+          var frm = frMap[val];
+          if (frm) { details.form = frm.form; details.route = frm.route; }
+        } else if (field === 'duration_refills') {
+          var drm = /^(\d+)\s*(jours?|semaines?|mois)(?:\s+R(\d+))?$/i.exec(val.trim());
+          if (drm) { details.duration = drm[1]; details.durationUnit = drm[2]; if (drm[3] !== undefined) details.refills = drm[3]; }
+          else if (/^long terme/i.test(val)) { details.duration = ''; details.durationUnit = ''; var rm = val.match(/R(\d+)/i); if (rm) details.refills = rm[1]; }
+        }
+      } else if (type === 'lab' || type === 'imaging' || type === 'referral') {
+        if (field === 'priority') {
+          details.priority = val;
+        } else if (field === 'exam' && type === 'imaging') {
+          var examParts = val.split(' ');
+          details.modality = examParts[0];
+          details.region = examParts.slice(1).join(' ');
+        } else if (field === 'specialty' && type === 'referral') {
+          details.specialty = val;
+        }
       }
       var newEntity = Object.assign({}, c.entity, { details: details });
       newEntity = Object.assign({}, newEntity, { label: deriveLabel(newEntity) });
       if (newEntity.type === 'prescription' && newEntity.rx) newEntity.rx = window.NOTE_DATA.deriveRx(details, newEntity.rx);
+      else if (newEntity.type === 'lab' && newEntity.rx) newEntity.rx = window.NOTE_DATA.deriveLabRx(details);
+      else if (newEntity.type === 'imaging' && newEntity.rx) newEntity.rx = window.NOTE_DATA.deriveImgRx(details);
+      else if (newEntity.type === 'referral' && newEntity.rx) newEntity.rx = window.NOTE_DATA.deriveRefRx(details);
       return Object.assign({}, cs, { [chipId]: { entity: newEntity } });
     });
     setInlineEdit(null);
@@ -215,6 +235,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
       if (ent.type === 'prescription' && ent.rx) ent.rx = window.NOTE_DATA.deriveRx(ent.details || {}, ent.rx);
       else if (ent.type === 'lab' && ent.rx) ent.rx = window.NOTE_DATA.deriveLabRx(ent.details || {});
       else if (ent.type === 'imaging' && ent.rx) ent.rx = window.NOTE_DATA.deriveImgRx(ent.details || {});
+      else if (ent.type === 'referral' && ent.rx) ent.rx = window.NOTE_DATA.deriveRefRx(ent.details || {});
       return Object.assign({}, cs, { [chipId]: { entity: ent } });
     });
     setPopover(null);
@@ -816,6 +837,12 @@ function ChipInlineEditor({ chipId, field, fieldRect, chips, onSave, onClose }) 
     if (details.duration) dp0.push(details.duration + ' ' + (details.durationUnit || 'jours'));
     if (details.refills) dp0.push('R' + details.refills);
     initialVal = dp0.join(' ');
+  } else if (field === 'priority') {
+    initialVal = details.priority || 'Routine';
+  } else if (field === 'exam') {
+    initialVal = [details.modality, details.region].filter(Boolean).join(' ');
+  } else if (field === 'specialty') {
+    initialVal = details.specialty || '';
   }
 
   var ALL_SUGGESTIONS = {
@@ -858,9 +885,32 @@ function ChipInlineEditor({ chipId, field, fieldRect, chips, onSave, onClose }) 
       '90 jours R0', '90 jours R3', '90 jours R11',
       '6 mois R1', '1 an R0',
       'Long terme R0', 'Long terme R3', 'Long terme R11'
+    ],
+    priority: [
+      'Routine', 'Prioritaire', 'Semi-urgent', 'Urgent', 'STAT'
+    ],
+    exam: [
+      'Radiographie Thorax', 'Radiographie Genou', 'Radiographie Hanche',
+      'Radiographie Cheville', 'Radiographie Poignet', 'Radiographie Colonne',
+      'Échographie Abdomen', 'Échographie Pelvis', 'Échographie Thyroïde',
+      'Échographie Sein', 'Échographie Carotides', 'Échographie Membres inférieurs',
+      'TDM Cerveau', 'TDM Thorax', 'TDM Abdomen-Pelvis', 'TDM Sinus',
+      'IRM Cerveau', 'IRM Rachis cervical', 'IRM Rachis lombaire',
+      'IRM Genou', 'IRM Épaule', 'IRM Cheville',
+      'Mammographie Bilatérale'
+    ],
+    specialty: [
+      'Cardiologie', 'Orthopédie', 'Dermatologie', 'Gastroentérologie',
+      'Neurologie', 'Pneumologie', 'Rhumatologie', 'Endocrinologie',
+      'Néphrologie', 'Urologie', 'Gynécologie', 'Ophtalmologie',
+      'ORL', 'Chirurgie générale', 'Chirurgie vasculaire', 'Hématologie',
+      'Oncologie', 'Psychiatrie', 'Gériatrie', 'Médecine interne'
     ]
   };
-  var FIELD_LABELS = { dose: 'Dose', frequency: 'Fréquence', form_route: 'Forme / Voie', duration_refills: 'Durée / Renouvellements' };
+  var FIELD_LABELS = {
+    dose: 'Dose', frequency: 'Fréquence', form_route: 'Forme / Voie', duration_refills: 'Durée / Renouvellements',
+    priority: 'Priorité', exam: 'Examen', specialty: 'Spécialité'
+  };
 
   var _q = React.useState(initialVal); var query = _q[0]; var setQuery = _q[1];
   var _ai = React.useState(0); var activeIdx = _ai[0]; var setActiveIdx = _ai[1];

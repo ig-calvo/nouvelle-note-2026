@@ -242,6 +242,13 @@ function App() {
                   <span style={{ position: 'absolute', top: -2, right: -10, minWidth: 18, height: 18, background: '#1975d1', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 700, padding: '0 3px' }}>{chipCounts.imaging}</span>
                 </div>
               )}
+              {/* Referral counter */}
+              {(chipCounts.referral > 0) && (
+                <div title="Références" style={{ position: 'relative', display: 'flex', alignItems: 'center', marginLeft: 4 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#25245E' }}>person_add</span>
+                  <span style={{ position: 'absolute', top: -2, right: -10, minWidth: 18, height: 18, background: '#1975d1', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 700, padding: '0 3px' }}>{chipCounts.referral}</span>
+                </div>
+              )}
               {/* Diagnostic counter */}
               {(chipCounts.diagnostic > 0) && (
                 <div title="Diagnostics" style={{ position: 'relative', display: 'flex', alignItems: 'center', marginLeft: 4 }}>

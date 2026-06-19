@@ -9,6 +9,7 @@ const ENTITY_TYPES = {
   instructions: { key: 'instructions', label: 'Consignes',    icon: 'menu_book', summaryGroup: 'Consignes' },
   diagnostic:   { key: 'diagnostic',   label: 'Diagnostic',   icon: 'local_hospital', summaryGroup: 'Diagnostics' },
   file:         { key: 'file',         label: 'Fichier',       icon: 'attach_file',    summaryGroup: 'Fichiers' },
+  referral:     { key: 'referral',     label: 'Référence',     icon: 'person_add',     summaryGroup: 'Références' },
 };
 
 // MED_CATALOG — dictionary used for the autocomplete dropdown.
@@ -247,7 +248,50 @@ const IMG_ITEMS = [
     details: { modality: 'Radiographie', region: 'Colonne dorsolombaire', views: 'AP + latérale', priority: 'Routine', context: '', contrast: 'Sans' } },
 ];
 
-// Unified order registry (rx / lab / img) — shared search + favorites
+// =========================================================
+// Référence spécialiste — commande « /ref »
+// =========================================================
+const REF_FAVS = new Set(['cardio', 'ortho', 'derm']);
+const REF_ITEMS = [
+  { key: 'cardio',  name: 'Cardiologie',       dose: '', active: true,
+    sig: 'Avis cardiologie · Routine',      chipSig: 'Routine',
+    details: { specialty: 'Cardiologie',       question: '', indication: '', priority: 'Routine', crds: '' } },
+  { key: 'ortho',   name: 'Orthopédie',         dose: '', freq: true,
+    sig: 'Avis orthopédie · Routine',       chipSig: 'Routine',
+    details: { specialty: 'Orthopédie',         question: '', indication: '', priority: 'Routine', crds: '' } },
+  { key: 'derm',    name: 'Dermatologie',       dose: '', freq: true,
+    sig: 'Avis dermatologie · Routine',     chipSig: 'Routine',
+    details: { specialty: 'Dermatologie',       question: '', indication: '', priority: 'Routine', crds: '' } },
+  { key: 'gastro',  name: 'Gastroentérologie',  dose: '', freq: true,
+    sig: 'Avis gastroentérologie · Routine', chipSig: 'Routine',
+    details: { specialty: 'Gastroentérologie',  question: '', indication: '', priority: 'Routine', crds: '' } },
+  { key: 'neuro',   name: 'Neurologie',         dose: '', freq: true,
+    sig: 'Avis neurologie · Routine',       chipSig: 'Routine',
+    details: { specialty: 'Neurologie',         question: '', indication: '', priority: 'Routine', crds: '' } },
+  { key: 'pneumo',  name: 'Pneumologie',        dose: '',
+    sig: 'Avis pneumologie · Routine',      chipSig: 'Routine',
+    details: { specialty: 'Pneumologie',        question: '', indication: '', priority: 'Routine', crds: '' } },
+  { key: 'rhuma',   name: 'Rhumatologie',       dose: '',
+    sig: 'Avis rhumatologie · Routine',     chipSig: 'Routine',
+    details: { specialty: 'Rhumatologie',       question: '', indication: '', priority: 'Routine', crds: '' } },
+  { key: 'endo',    name: 'Endocrinologie',     dose: '',
+    sig: 'Avis endocrinologie · Routine',   chipSig: 'Routine',
+    details: { specialty: 'Endocrinologie',     question: '', indication: '', priority: 'Routine', crds: '' } },
+  { key: 'nephro',  name: 'Néphrologie',        dose: '',
+    sig: 'Avis néphrologie · Routine',      chipSig: 'Routine',
+    details: { specialty: 'Néphrologie',        question: '', indication: '', priority: 'Routine', crds: '' } },
+  { key: 'uro',     name: 'Urologie',           dose: '',
+    sig: 'Avis urologie · Routine',         chipSig: 'Routine',
+    details: { specialty: 'Urologie',           question: '', indication: '', priority: 'Routine', crds: '' } },
+  { key: 'gyn',     name: 'Gynécologie',        dose: '',
+    sig: 'Avis gynécologie · Routine',      chipSig: 'Routine',
+    details: { specialty: 'Gynécologie',        question: '', indication: '', priority: 'Routine', crds: '' } },
+  { key: 'ophthal', name: 'Ophtalmologie',      dose: '',
+    sig: 'Avis ophtalmologie · Routine',    chipSig: 'Routine',
+    details: { specialty: 'Ophtalmologie',      question: '', indication: '', priority: 'Routine', crds: '' } },
+];
+
+// Unified order registry (rx / lab / img / ref) — shared search + favorites
 const ORDER_DEFS = {
   rx:  { kbd: 'rx',  type: 'prescription', icon: 'pill',      glyph: '℞', verb: 'prescrire', emptyNoun: 'produit',
          sections: ['Favoris', 'Traitements fréquemment prescrits', 'Autres produits trouvés'],
@@ -255,9 +299,12 @@ const ORDER_DEFS = {
   lab: { kbd: 'lab', type: 'lab',          icon: 'science',   glyph: null, verb: 'demander',  emptyNoun: 'analyse',
          sections: ['Favoris', 'Analyses fréquemment demandées', 'Autres analyses'],
          favs: LAB_FAVS, items: function () { return LAB_ITEMS; }, search: function (q) { return _searchList(LAB_ITEMS, LAB_FAVS, q); } },
-  img: { kbd: 'img', type: 'imaging',      icon: 'radiology', glyph: null, verb: 'demander',  emptyNoun: 'examen',
+  img: { kbd: 'img', type: 'imaging',      icon: 'radiology',  glyph: null, verb: 'demander',  emptyNoun: 'examen',
          sections: ['Favoris', 'Examens fréquemment demandés', 'Autres examens'],
          favs: IMG_FAVS, items: function () { return IMG_ITEMS; }, search: function (q) { return _searchList(IMG_ITEMS, IMG_FAVS, q); } },
+  ref: { kbd: 'ref', type: 'referral',     icon: 'person_add', glyph: null, verb: 'référer',   emptyNoun: 'spécialité',
+         sections: ['Favoris', 'Spécialités fréquentes', 'Autres spécialités'],
+         favs: REF_FAVS, items: function () { return REF_ITEMS; }, search: function (q) { return _searchList(REF_ITEMS, REF_FAVS, q); } },
 };
 
 function _searchList(list, favSet, q) {
@@ -286,9 +333,14 @@ function deriveLabRx(d) {
   return { name: name, dose: '', sig: sig, kind: 'lab' };
 }
 function deriveImgRx(d) {
-  const name = [d.modality, d.region].filter(Boolean).join(' ') || 'Demande d’imagerie';
+  const name = [d.modality, d.region].filter(Boolean).join(' ') || "Demande d'imagerie";
   const sig = [d.contrast && d.contrast !== 'Sans' ? 'Avec contraste' : '', d.views, d.priority].filter(Boolean).join(' · ');
   return { name: name, dose: '', sig: sig, kind: 'img' };
+}
+function deriveRefRx(d) {
+  const name = d.specialty || 'Référence spécialiste';
+  const sig = d.priority || 'Routine';
+  return { name: name, dose: '', sig: sig, kind: 'ref' };
 }
 
 const RECOGNIZERS = [
@@ -327,11 +379,15 @@ const SLASH_ITEMS = [
       details: { tests: ['FSC'], priority: 'Routine', fasting: false, context: '', collection: 'Au CH le plus proche' } } },
   { key: 'imaging', section: 'Ajouter', icon: 'radiology', title: 'Imagerie', desc: 'Radio, écho, TDM', kbd: 'img',
     orderSearch: true,
-    template: { type: 'imaging', label: 'Demande d’imagerie', text: 'Demande d’imagerie',
+    template: { type: 'imaging', label: "Demande d'imagerie", text: "Demande d'imagerie",
       details: { modality: 'Radiographie', region: '', views: '', priority: 'Routine', context: '', contrast: 'Sans' } } },
+  { key: 'referral', section: 'Ajouter', icon: 'person_add', title: 'Référence spécialiste', desc: 'Cardio, ortho, derm…', kbd: 'ref',
+    orderSearch: true,
+    template: { type: 'referral', label: 'Référence spécialiste', text: 'Référence spécialiste',
+      details: { specialty: '', question: '', indication: '', priority: 'Routine', crds: '' } } },
   { key: 'problem', section: 'Dossier', icon: 'flag', title: 'Problème', desc: 'Ajouter au problématique', kbd: 'pb',
     template: { type: 'problem', label: 'Problème', text: 'Problème',
-      details: { name: '', severity: 'Modéré', since: 'Aujourd’hui', notes: '' } } },
+      details: { name: '', severity: 'Modéré', since: "Aujourd'hui", notes: '' } } },
   { key: 'instructions', section: 'Communication', icon: 'menu_book', title: 'Consignes', desc: 'Consignes au patient', kbd: 'instr',
     template: { type: 'instructions', label: 'Consignes', text: 'Consignes au patient',
       details: { title: '', body: '', delivery: 'Imprimer + portail' } } },
@@ -372,7 +428,7 @@ const SCENARIOS = [
   { key: 'empty',  name: 'Note vierge', desc: 'Commencer à zéro',
     detail: '', conclusion: '', hint: null },
   { key: 'rx',     name: 'Démo — prescription', desc: 'Tapez « mét » pour voir la liste',
-    detail: 'Motif de consultation\nPatiente enceinte de 22 sem consulte pour otalgie droite depuis 48 h, accompagnée d’un écoulement clair intermittent et d’une sensation d’oreille bouchée. Pas de vertiges, pas d’acouphènes, pas de fièvre frissonnante.\n\nAntécédents\nAsthme léger bien contrôlé sous Ventolin PRN. Grossesse actuelle sans complication, suivie en GARE. Allergie légère à la pénicilline documentée en 2019 — éruption maculopapuleuse seulement, pas d’œdème ni d’urticaire.\n\nExamen physique\nTempérature 38,1 °C, TA 118/72, FC 84 régulière, SpO₂ 98 % à l’air ambiant. Patiente alerte, confortable.\nOtoscopie droite : tympan bombé, érythémateux, opaque, perte du triangle lumineux. Otoscopie gauche : tympan nacré, mobile à l’insufflation, reliefs normaux.\nAuscultation pulmonaire claire, pas de râles ni de sibilances. Pharynx sans érythème. Adénopathies cervicales non palpables.\n\nRevue des systèmes\nPas de céphalées, pas de nausées, pas d’éruption cutanée. Mouvements fœtaux perçus, pas de contractions.',
+    detail: "Motif de consultation\nPatiente enceinte de 22 sem consulte pour otalgie droite depuis 48 h, accompagnée d'un écoulement clair intermittent et d'une sensation d'oreille bouchée. Pas de vertiges, pas d'acouphènes, pas de fièvre frissonnante.\n\nAntécédents\nAsthme léger bien contrôlé sous Ventolin PRN. Grossesse actuelle sans complication, suivie en GARE. Allergie légère à la pénicilline documentée en 2019 — éruption maculopapuleuse seulement, pas d'œdème ni d'urticaire.\n\nExamen physique\nTempérature 38,1 °C, TA 118/72, FC 84 régulière, SpO₂ 98 % à l'air ambiant. Patiente alerte, confortable.\nOtoscopie droite : tympan bombé, érythémateux, opaque, perte du triangle lumineux. Otoscopie gauche : tympan nacré, mobile à l'insufflation, reliefs normaux.\nAuscultation pulmonaire claire, pas de râles ni de sibilances. Pharynx sans érythème. Adénopathies cervicales non palpables.\n\nRevue des systèmes\nPas de céphalées, pas de nausées, pas d'éruption cutanée. Mouvements fœtaux perçus, pas de contractions..",
     conclusion: 'Impression\nInfection bactérienne — plan de traitement à venir.\n\nPlan\nAntibiothérapie: mét',
     hint: 'Le curseur est placé après « mét ». Continuez à taper pour filtrer la liste. ↑ ↓ pour naviguer, Entrée / Tab pour choisir.' },
   { key: 'composed', name: 'Note avancée', desc: 'Plusieurs items confirmés',
@@ -394,4 +450,4 @@ const SCENARIOS = [
 
 window.NOTE_DATA = { ENTITY_TYPES, RECOGNIZERS, MED_CATALOG, SLASH_ITEMS, PATIENT, PROBLEMS, VITALS, RESULTS_RECENT, SCENARIOS,
   RX_FAVS, RX_ITEMS, searchRx, toggleRxFav, deriveRx,
-  ORDER_DEFS, orderKindForKbd, searchOrder, toggleOrderFav, deriveLabRx, deriveImgRx };
+  ORDER_DEFS, orderKindForKbd, searchOrder, toggleOrderFav, deriveLabRx, deriveImgRx, deriveRefRx };

@@ -36,6 +36,7 @@ function ChipPopover({ chip, anchorRect, onClose, onSave, onRevert, onDelete }) 
         {draft.type === 'imaging' && <ImgFields d={draft.details} up={up} />}
         {draft.type === 'problem' && <PbFields d={draft.details} up={up} />}
         {draft.type === 'instructions' && <InsFields d={draft.details} up={up} />}
+        {draft.type === 'referral' && <RefFields d={draft.details} up={up} />}
       </div>
       <div className="popover-footer">
         <button className="btn btn-t btn-sm" onClick={() => onRevert(chip.id)}>
@@ -120,6 +121,28 @@ function PbFields({ d, up }) { return (<>
 function InsFields({ d, up }) { return (<>
   <div className="field"><label>Titre</label><input value={d.title} onChange={e=>up('title', e.target.value)} /></div>
   <div className="field"><label>Contenu</label><textarea rows={4} value={d.body} onChange={e=>up('body', e.target.value)} /></div>
+</>); }
+function RefFields({ d, up }) { return (<>
+  <div className="field"><label>Spécialité</label>
+    <select value={d.specialty||''} onChange={e=>up('specialty', e.target.value)}>
+      <option value="">— Choisir —</option>
+      <option>Cardiologie</option><option>Orthopédie</option><option>Dermatologie</option>
+      <option>Gastroentérologie</option><option>Neurologie</option><option>Pneumologie</option>
+      <option>Rhumatologie</option><option>Endocrinologie</option><option>Néphrologie</option>
+      <option>Urologie</option><option>Gynécologie</option><option>Ophtalmologie</option>
+      <option>ORL</option><option>Chirurgie générale</option><option>Chirurgie vasculaire</option>
+      <option>Hématologie</option><option>Oncologie</option><option>Psychiatrie</option>
+      <option>Gériatrie</option><option>Médecine interne</option>
+    </select></div>
+  <div className="field"><label>Question clinique</label><textarea rows={2} value={d.question||''} onChange={e=>up('question', e.target.value)} /></div>
+  <div className="row">
+    <div className="field"><label>Priorité</label>
+      <select value={d.priority||'Routine'} onChange={e=>up('priority', e.target.value)}>
+        <option>Routine</option><option>Semi-urgent</option><option>Urgent</option><option>STAT</option>
+      </select></div>
+  </div>
+  <div className="field"><label>Indication</label><input value={d.indication||''} onChange={e=>up('indication', e.target.value)} /></div>
+  <div className="field"><label>CRDS / guichet</label><input value={d.crds||''} onChange={e=>up('crds', e.target.value)} /></div>
 </>); }
 
 // Slash menu

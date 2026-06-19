@@ -39,60 +39,70 @@ function newChipId() {return 'c' + _chipSeq++;}
         const ic = document.createElement('span');
         if (kind === 'rx') {
           ic.className = 'chip-rx-icon';
+          ic.setAttribute('data-action', 'modal');
+          ic.setAttribute('title', 'Modifier les détails complets');
           ic.textContent = '℞';
         } else {
           ic.className = 'material-symbols-outlined chip-rx-glyph';
-          ic.textContent = kind === 'lab' ? 'science' : 'radiology';
+          ic.setAttribute('data-action', 'modal');
+          ic.setAttribute('title', 'Modifier les détails');
+          ic.textContent = kind === 'lab' ? 'science' : kind === 'img' ? 'radiology' : kind === 'ref' ? 'person_add' : 'bookmark';
         }
         node.appendChild(ic);
         const nm = document.createElement('span');
         nm.className = 'chip-rx-name';
         nm.textContent = data.rx.name || '';
         node.appendChild(nm);
-        const ds = document.createElement('span');
-        ds.className = 'chip-rx-dose';
-        ds.setAttribute('data-field', 'dose');
-        ds.textContent = data.rx.dose || '';
-        node.appendChild(ds);
-        // If structured details available, render split sig parts; otherwise fall back to sig string
-        if (d.frequency) {
-          const qty = d.form === 'comprimé' ? '1 co' : d.form === 'aérosol-doseur' ? '2 inh' : d.form === 'gélule' ? '1 gél' : '1 dose';
-          const fr = document.createElement('span');
-          fr.className = 'chip-rx-formroute';
-          fr.setAttribute('data-field', 'form_route');
-          fr.textContent = (qty + (d.route ? ' ' + d.route : '')).trim();
-          node.appendChild(fr);
-          const sep1 = document.createElement('span'); sep1.className = 'chip-rx-sep'; sep1.textContent = ' '; node.appendChild(sep1);
-          const freq = document.createElement('span');
-          freq.className = 'chip-rx-freq';
-          freq.setAttribute('data-field', 'frequency');
-          freq.textContent = d.frequency;
-          node.appendChild(freq);
-          const durParts = [];
-          if (d.duration && d.duration !== '—') durParts.push('× ' + d.duration + ' ' + (d.durationUnit || 'jours'));
-          if (d.refills !== undefined && String(d.refills) !== '' && String(d.refills) !== '0') durParts.push('R' + d.refills);
-          if (durParts.length) {
-            const sep2 = document.createElement('span'); sep2.className = 'chip-rx-sep'; sep2.textContent = ' '; node.appendChild(sep2);
-            const dur = document.createElement('span');
-            dur.className = 'chip-rx-dur';
-            dur.setAttribute('data-field', 'duration_refills');
-            dur.textContent = durParts.join(' ');
-            node.appendChild(dur);
+        if (kind === 'rx') {
+          const ds = document.createElement('span');
+          ds.className = 'chip-rx-dose';
+          ds.setAttribute('data-field', 'dose');
+          ds.textContent = data.rx.dose || '';
+          node.appendChild(ds);
+          // If structured details available, render split sig parts; otherwise fall back to sig string
+          if (d.frequency) {
+            const qty = d.form === 'comprimé' ? '1 co' : d.form === 'aérosol-doseur' ? '2 inh' : d.form === 'gélule' ? '1 gél' : '1 dose';
+            const fr = document.createElement('span');
+            fr.className = 'chip-rx-formroute';
+            fr.setAttribute('data-field', 'form_route');
+            fr.textContent = (qty + (d.route ? ' ' + d.route : '')).trim();
+            node.appendChild(fr);
+            const sep1 = document.createElement('span'); sep1.className = 'chip-rx-sep'; sep1.textContent = ' '; node.appendChild(sep1);
+            const freq = document.createElement('span');
+            freq.className = 'chip-rx-freq';
+            freq.setAttribute('data-field', 'frequency');
+            freq.textContent = d.frequency;
+            node.appendChild(freq);
+            const durParts = [];
+            if (d.duration && d.duration !== '—') durParts.push('× ' + d.duration + ' ' + (d.durationUnit || 'jours'));
+            if (d.refills !== undefined && String(d.refills) !== '' && String(d.refills) !== '0') durParts.push('R' + d.refills);
+            if (durParts.length) {
+              const sep2 = document.createElement('span'); sep2.className = 'chip-rx-sep'; sep2.textContent = ' '; node.appendChild(sep2);
+              const dur = document.createElement('span');
+              dur.className = 'chip-rx-dur';
+              dur.setAttribute('data-field', 'duration_refills');
+              dur.textContent = durParts.join(' ');
+              node.appendChild(dur);
+            }
+          } else {
+            const sg = document.createElement('span');
+            sg.className = 'chip-rx-sig';
+            sg.textContent = data.rx.sig || '';
+            node.appendChild(sg);
           }
         } else {
-          const sg = document.createElement('span');
-          sg.className = 'chip-rx-sig';
-          sg.textContent = data.rx.sig || '';
-          node.appendChild(sg);
-        }
-        // Edit button — visible on chip hover, opens full modal
-        if (kind === 'rx') {
-          const eb = document.createElement('span');
-          eb.className = 'chip-rx-editbtn';
-          eb.setAttribute('data-action', 'modal');
-          eb.setAttribute('title', 'Modifier les détails complets');
-          eb.textContent = '···';
-          node.appendChild(eb);
+          // Lab / Img / Ref: clickable priority badge (+ optional extras)
+          const pr = document.createElement('span');
+          pr.className = 'chip-rx-badge';
+          pr.setAttribute('data-field', 'priority');
+          pr.textContent = d.priority || 'Routine';
+          node.appendChild(pr);
+          if (kind === 'lab' && d.fasting) {
+            const ft = document.createElement('span');
+            ft.className = 'chip-rx-sig';
+            ft.textContent = 'À jeun';
+            node.appendChild(ft);
+          }
         }
         return node;
       }
@@ -172,7 +182,7 @@ function newChipId() {return 'c' + _chipSeq++;}
         ic.textContent = '℞';
       } else {
         ic.className = 'material-symbols-outlined orderbadge-glyph';
-        ic.textContent = kind === 'lab' ? 'science' : kind === 'dx' ? 'local_hospital' : 'radiology';
+        ic.textContent = kind === 'lab' ? 'science' : kind === 'dx' ? 'local_hospital' : kind === 'ref' ? 'person_add' : 'radiology';
       }
       node.appendChild(ic);
       return node;
@@ -599,12 +609,12 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       const slashIntact = q.getText(s.startIndex, 1) === '/';
       // "/rx ", "/lab ", "/img " (kind followed by a space) promotes to order
       // mode: the literal text collapses into an icon badge.
-      const orderSpace = /^(rx|lab|img)\s/i.exec(query);
+      const orderSpace = /^(rx|lab|img|ref)\s/i.exec(query);
       const dxSpace = /^dx\s/i.exec(query);
       if (caret <= s.startIndex || !slashIntact || /\n/.test(query)) {
         closeSlashMenu();
       } else if (orderSpace) {
-        enterOrderMode(orderSpace[1].toLowerCase(), query.slice(orderSpace[0].length));
+        enterOrderMode(orderSpace[1].toLowerCase(), query.slice(orderSpace[0].length), caret);
         return;
       } else if (dxSpace) {
         enterDiagnosticMode(query.slice(dxSpace[0].length));
@@ -765,7 +775,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
   // ---------------------------------------------------------
   // Mode commande (/rx · /lab · /img) — recherche et insertion
   // ---------------------------------------------------------
-  function enterOrderMode(kbd, carryQuery) {
+  function enterOrderMode(kbd, carryQuery, caretHint) {
     const q = quillRef.current; if (!q) return;
     const kind = window.NOTE_DATA.orderKindForKbd(kbd) || 'rx';
     carryQuery = carryQuery || '';
@@ -775,8 +785,9 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     let at;
     if (s) {
       // Remove the literal "/…" text from the slash up to the live caret.
-      const sel = q.getSelection();
-      const end = sel ? sel.index : s.startIndex + (s.query || '').length + 1;
+      // caretHint is used when called from text-change (q.getSelection is stale then).
+      const sel = caretHint == null ? q.getSelection() : null;
+      const end = caretHint != null ? caretHint : (sel ? sel.index : s.startIndex + (s.query || '').length + 1);
       q.deleteText(s.startIndex, Math.max(0, end - s.startIndex), 'silent');
       at = s.startIndex;
     } else {
