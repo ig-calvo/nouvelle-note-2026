@@ -719,12 +719,8 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
 
           <div style={neStyles.divider} />
 
-          {/* Ajouter une section / formulaire diagnostic (déclenché par /dx) */}
+          {/* Formulaire diagnostic (déclenché par /dx) */}
           <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button style={neStyles.addSectionBtn} onClick={addSection}>
-              <span className="material-icons-outlined" style={{ fontSize: 18 }}>add</span>
-              Ajouter une section
-            </button>
             {addingDiagnostic &&
               React.createElement('div', { style: neStyles.addDiagForm },
                 React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 18, color: '#1a5fd4', flexShrink: 0 } }, 'local_hospital'),

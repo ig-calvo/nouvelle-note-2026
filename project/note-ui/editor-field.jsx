@@ -1085,6 +1085,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         onPickTool={chooseSlashItem}
         onPickOrder={(kbd) => enterOrderMode(kbd)}
         onPickFile={() => { fileInputRef.current && fileInputRef.current.click(); }}
+        onAddSection={onAddSectionRef.current}
         onClose={() => setFuncMenu(null)} />
 
       }

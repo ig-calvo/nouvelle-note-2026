@@ -182,7 +182,7 @@ function SlashMenu({ position, query, onSelect, onClose, activeIndex, items }) {
 }
 
 // Functions / "Ajouter" menu — opened from the + button
-function AddMenu({ position, orders, onPickOrder, onPickFile, onClose }) {
+function AddMenu({ position, orders, onPickOrder, onPickFile, onAddSection, onClose }) {
   const stop = (e) => e.stopPropagation();
   const [showFileSub, setShowFileSub] = useStateP(false);
 
@@ -219,6 +219,11 @@ function AddMenu({ position, orders, onPickOrder, onPickFile, onClose }) {
           <span className="material-icons-outlined ic">bolt</span>
           <span className="lbl">Textes rapides</span>
           <span className="kbd">Ctrl+R</span>
+        </button>
+        <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); if (onAddSection) onAddSection(); onClose(); }}>
+          <span className="material-icons-outlined ic">add</span>
+          <span className="lbl">Ajouter une section</span>
+          <span className="kbd">/sec</span>
         </button>
 
         <div className="addmenu-div" />
