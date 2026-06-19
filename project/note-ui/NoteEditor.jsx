@@ -393,20 +393,23 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
                     ref: defaultZoneRef,
                     className: 'ct-default-zone' + (dragging && drop && drop.type === 'default' ? ' is-target' : '')
                   },
-                    /* Contrôles de déplacement de la zone */
-                    React.createElement('div', { style: neStyles.zoneControls },
-                      React.createElement('button', {
-                        style: Object.assign({}, neStyles.tbtn, toolZoneIndex === 0 ? { opacity: 0.25 } : {}),
-                        title: 'Remonter la zone d\'outils',
-                        disabled: toolZoneIndex === 0,
-                        onClick: moveToolZoneUp
-                      }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_upward')),
-                      React.createElement('button', {
-                        style: Object.assign({}, neStyles.tbtn, toolZoneIndex >= sections.length ? { opacity: 0.25 } : {}),
-                        title: 'Descendre la zone d\'outils',
-                        disabled: toolZoneIndex >= sections.length,
-                        onClick: moveToolZoneDown
-                      }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_downward'))
+                    /* En-tête aligné comme les sections */
+                    React.createElement('div', { style: neStyles.secHead },
+                      React.createElement('span', null),
+                      React.createElement('div', { style: { display: 'flex', gap: 2, alignItems: 'center' } },
+                        React.createElement('button', {
+                          style: Object.assign({}, neStyles.tbtn, toolZoneIndex === 0 ? { opacity: 0.25 } : {}),
+                          title: 'Remonter la zone d\'outils',
+                          disabled: toolZoneIndex === 0,
+                          onClick: moveToolZoneUp
+                        }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_upward')),
+                        React.createElement('button', {
+                          style: Object.assign({}, neStyles.tbtn, toolZoneIndex >= sections.length ? { opacity: 0.25 } : {}),
+                          title: 'Descendre la zone d\'outils',
+                          disabled: toolZoneIndex >= sections.length,
+                          onClick: moveToolZoneDown
+                        }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_downward'))
+                      )
                     ),
 
                     React.createElement('div', { style: neStyles.chipsRow },
