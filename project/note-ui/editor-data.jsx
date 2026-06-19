@@ -390,7 +390,7 @@ const SLASH_ITEMS = [
   { key: 'problem', section: 'Dossier', icon: 'flag', title: 'Problème', desc: 'Ajouter au problématique', kbd: 'pb',
     template: { type: 'problem', label: 'Problème', text: 'Problème',
       details: { name: '', severity: 'Modéré', since: "Aujourd'hui", notes: '' } } },
-  { key: 'instructions', section: 'Communication', icon: 'menu_book', title: 'Consignes', desc: 'Consignes au patient', kbd: 'instr',
+  { key: 'instructions', section: 'Communication', icon: 'menu_book', title: 'Instructions patient', desc: 'Consignes au patient', kbd: 'instr',
     template: { type: 'instructions', label: 'Consignes', text: 'Consignes au patient',
       details: { title: '', body: '', delivery: 'Imprimer + portail' } } },
 ];
