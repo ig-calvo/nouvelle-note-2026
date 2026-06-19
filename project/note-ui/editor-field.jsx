@@ -62,11 +62,16 @@ function newChipId() {return 'c' + _chipSeq++;}
           // If structured details available, render split sig parts; otherwise fall back to sig string
           if (d.frequency) {
             const qty = d.form === 'comprimé' ? '1 co' : d.form === 'aérosol-doseur' ? '2 inh' : d.form === 'gélule' ? '1 gél' : '1 dose';
-            const fr = document.createElement('span');
-            fr.className = 'chip-rx-formroute';
-            fr.setAttribute('data-field', 'form_route');
-            fr.textContent = (qty + (d.route ? ' ' + d.route : '')).trim();
-            node.appendChild(fr);
+            const fm = document.createElement('span');
+            fm.className = 'chip-rx-form';
+            fm.setAttribute('data-field', 'form');
+            fm.textContent = qty;
+            node.appendChild(fm);
+            const rt = document.createElement('span');
+            rt.className = 'chip-rx-route';
+            rt.setAttribute('data-field', 'route');
+            rt.textContent = d.route || '';
+            node.appendChild(rt);
             const sep1 = document.createElement('span'); sep1.className = 'chip-rx-sep'; sep1.textContent = ' '; node.appendChild(sep1);
             const freq = document.createElement('span');
             freq.className = 'chip-rx-freq';
@@ -514,12 +519,13 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
           const ds = node.querySelector('.chip-rx-dose');
           if (ds && ds.textContent !== (rx.dose || '')) ds.textContent = rx.dose || '';
           // Update split sig spans
-          const fr = node.querySelector('.chip-rx-formroute');
-          if (fr && d.form) {
+          const fmEl = node.querySelector('.chip-rx-form');
+          if (fmEl && d.form) {
             const qty = d.form === 'comprimé' ? '1 co' : d.form === 'aérosol-doseur' ? '2 inh' : d.form === 'gélule' ? '1 gél' : '1 dose';
-            const nfr = (qty + (d.route ? ' ' + d.route : '')).trim();
-            if (fr.textContent !== nfr) fr.textContent = nfr;
+            if (fmEl.textContent !== qty) fmEl.textContent = qty;
           }
+          const rtEl = node.querySelector('.chip-rx-route');
+          if (rtEl && d.route !== undefined && rtEl.textContent !== d.route) rtEl.textContent = d.route || '';
           const freqEl = node.querySelector('.chip-rx-freq');
           if (freqEl && d.frequency && freqEl.textContent !== d.frequency) freqEl.textContent = d.frequency;
           const durEl = node.querySelector('.chip-rx-dur');

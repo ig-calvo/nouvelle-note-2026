@@ -193,15 +193,21 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
           else { details.dose = val.replace(/[^0-9.]/g, '') || details.dose; }
         } else if (field === 'frequency') {
           details.frequency = val;
-        } else if (field === 'form_route') {
-          var frMap = {
-            '1 co PO': { form: 'comprimé', route: 'PO' }, '2 co PO': { form: 'comprimé', route: 'PO' },
-            '½ co PO': { form: 'comprimé', route: 'PO' }, '1 gél PO': { form: 'gélule', route: 'PO' },
-            '2 inh Inh': { form: 'aérosol-doseur', route: 'Inhalé' }, '1 amp SC': { form: 'ampoule', route: 'SC' },
-            '5 mL PO': { form: 'sirop', route: 'PO' }, '10 mL PO': { form: 'sirop', route: 'PO' }
+        } else if (field === 'form') {
+          var fmMap = {
+            '1 co': 'comprimé', '2 co': 'comprimé', '½ co': 'comprimé', '1½ co': 'comprimé', '3 co': 'comprimé', '4 co': 'comprimé',
+            '1 gél': 'gélule', '2 gél': 'gélule',
+            '1 cap': 'capsule', '2 cap': 'capsule',
+            '1 timbre': 'timbre',
+            '2 inh': 'aérosol-doseur', '1 inh': 'aérosol-doseur', '4 inh': 'aérosol-doseur',
+            '1 vap nasale': 'vaporisateur nasal', '2 vap nasale': 'vaporisateur nasal',
+            '1 amp': 'ampoule',
+            '5 mL': 'sirop', '10 mL': 'sirop', '15 mL': 'sirop', '20 mL': 'sirop',
+            '1 supp': 'suppositoire'
           };
-          var frm = frMap[val];
-          if (frm) { details.form = frm.form; details.route = frm.route; }
+          details.form = fmMap[val] || val;
+        } else if (field === 'route') {
+          details.route = val;
         } else if (field === 'duration_refills') {
           var drm = /^(\d+)\s*(jours?|semaines?|mois)(?:\s+R(\d+))?$/i.exec(val.trim());
           if (drm) { details.duration = drm[1]; details.durationUnit = drm[2]; if (drm[3] !== undefined) details.refills = drm[3]; }
@@ -834,9 +840,10 @@ function ChipInlineEditor({ chipId, field, fieldRect, chips, onSave, onClose }) 
   var initialVal = '';
   if (field === 'dose') initialVal = (details.dose || '') + (details.unit || '');
   else if (field === 'frequency') initialVal = details.frequency || '';
-  else if (field === 'form_route') {
-    var qty0 = details.form === 'comprimé' ? '1 co' : details.form === 'aérosol-doseur' ? '2 inh' : details.form === 'gélule' ? '1 gél' : '';
-    initialVal = (qty0 + (details.route ? ' ' + details.route : '')).trim();
+  else if (field === 'form') {
+    initialVal = details.form === 'comprimé' ? '1 co' : details.form === 'aérosol-doseur' ? '2 inh' : details.form === 'gélule' ? '1 gél' : details.form || '';
+  } else if (field === 'route') {
+    initialVal = details.route || '';
   } else if (field === 'duration_refills') {
     var dp0 = [];
     if (details.duration) dp0.push(details.duration + ' ' + (details.durationUnit || 'jours'));
@@ -868,18 +875,20 @@ function ChipInlineEditor({ chipId, field, fieldRect, chips, onSave, onClose }) 
       '1× / semaine', '2× / semaine', '3× / semaine',
       '1× / 2 semaines', '1× / mois'
     ],
-    form_route: [
-      '1 co PO', '2 co PO', '½ co PO', '1½ co PO', '3 co PO', '4 co PO',
-      '1 gél PO', '2 gél PO',
-      '1 cap PO', '2 cap PO',
-      '1 co SL',
-      '1 timbre TD',
-      '2 inh Inh', '1 inh Inh', '4 inh Inh',
-      '1 vap nasale Nasal', '2 vap nasale Nasal',
-      '1 amp SC', '1 amp IM', '1 amp IV',
-      '5 mL PO', '10 mL PO', '15 mL PO', '20 mL PO',
-      '1 supp PR',
+    form: [
+      '1 co', '2 co', '½ co', '1½ co', '3 co', '4 co',
+      '1 gél', '2 gél',
+      '1 cap', '2 cap',
+      '1 timbre',
+      '2 inh', '1 inh', '4 inh',
+      '1 vap nasale', '2 vap nasale',
+      '1 amp',
+      '5 mL', '10 mL', '15 mL', '20 mL',
+      '1 supp',
       'Appliquer localement'
+    ],
+    route: [
+      'PO', 'SL', 'TD', 'Inhalé', 'Nasal', 'SC', 'IM', 'IV', 'PR', 'Topique', 'Auriculaire', 'Ophtalmique'
     ],
     duration_refills: [
       '3 jours R0', '5 jours R0', '7 jours R0', '10 jours R0', '14 jours R0',
@@ -913,7 +922,7 @@ function ChipInlineEditor({ chipId, field, fieldRect, chips, onSave, onClose }) 
     ]
   };
   var FIELD_LABELS = {
-    dose: 'Dose', frequency: 'Fréquence', form_route: 'Forme / Voie', duration_refills: 'Durée / Renouvellements',
+    dose: 'Dose', frequency: 'Fréquence', form: 'Forme', route: 'Voie', duration_refills: 'Durée / Renouvellements',
     priority: 'Priorité', exam: 'Examen', specialty: 'Spécialité'
   };
 
