@@ -8,6 +8,9 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
   const [sections, setSections] = React.useState(
     function() { return DEFAULT_SECTIONS.map(function(s) { return Object.assign({}, s); }); }
   );
+  // Position de la zone d'outils entre les sections (0 = avant tout, 1 = entre s[0] et s[1], ...)
+  const [toolZoneIndex, setToolZoneIndex] = React.useState(1);
+
   // splits pour drag-to-place: { [sectionId]: { top: '', bot: '' } }
   const [sectionSplits, setSectionSplits] = React.useState({});
 
@@ -31,7 +34,7 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
   // toolLoc: 'default' | sectionId
   const [toolLoc, setToolLoc] = React.useState('default');
   const [dragging, setDragging] = React.useState(false);
-  const [drop, setDrop] = React.useState(null); // null | {type:'default'} | {type:'gap',field:sectionId,k,y}
+  const [drop, setDrop] = React.useState(null);
   const sectionWrapRefs = React.useRef({});
   const defaultZoneRef = React.useRef(null);
   const dragRef = React.useRef({ on: false });
@@ -61,23 +64,23 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
   }
   function setSplitTop(sectionId, valOrFn) {
     setSectionSplits(function(sp) {
-      const prev = sp[sectionId] || { top: '', bot: '' };
+      var prev = sp[sectionId] || { top: '', bot: '' };
       return Object.assign({}, sp, { [sectionId]: Object.assign({}, prev, { top: typeof valOrFn === 'function' ? valOrFn(prev.top) : valOrFn }) });
     });
   }
   function setSplitBot(sectionId, valOrFn) {
     setSectionSplits(function(sp) {
-      const prev = sp[sectionId] || { top: '', bot: '' };
+      var prev = sp[sectionId] || { top: '', bot: '' };
       return Object.assign({}, sp, { [sectionId]: Object.assign({}, prev, { bot: typeof valOrFn === 'function' ? valOrFn(prev.bot) : valOrFn }) });
     });
   }
 
   function deriveLabel(entity) {
-    const d = entity.details || {};
+    var d = entity.details || {};
     if (entity.type === 'prescription') {
-      const head = [d.molecule, d.dose ? d.dose + ' ' + d.unit : ''].filter(Boolean).join(' ');
-      const qty = d.form === 'comprimé' ? '1 co' : d.form === 'aérosol-doseur' ? '2 inh' : '1 dose';
-      const tail = [qty, d.route, d.frequency, d.duration ? '× ' + d.duration + ' ' + (d.durationUnit || 'jours') : ''].filter(Boolean).join(' ');
+      var head = [d.molecule, d.dose ? d.dose + ' ' + d.unit : ''].filter(Boolean).join(' ');
+      var qty = d.form === 'comprimé' ? '1 co' : d.form === 'aérosol-doseur' ? '2 inh' : '1 dose';
+      var tail = [qty, d.route, d.frequency, d.duration ? '× ' + d.duration + ' ' + (d.durationUnit || 'jours') : ''].filter(Boolean).join(' ');
       return [head, tail].filter(Boolean).join(' — ') || entity.label;
     }
     if (entity.type === 'lab') return d.tests && d.tests[0] ? d.tests.join(', ').slice(0, 40) : entity.label;
@@ -88,13 +91,7 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
   }
 
   function onAddChip(fieldId, { chipId, entity, openAfter, storedOverride }) {
-    // Determine which section and part (null / 'top' / 'bot') the fieldId refers to
     var targetSectionId = null, part = null;
-    // Use sections from current render — snapshot via a ref isn't needed here since
-    // this is called in event handlers where sections is closed over correctly.
-    // We iterate through the sections state we have.
-    // Note: sections may be stale in a closure; we rely on the fact that chip insertion
-    // always follows a user gesture on a rendered EditorField whose fieldId is valid.
     for (var i = 0; i < sections.length; i++) {
       var s = sections[i];
       if (fieldId === s.id) { targetSectionId = s.id; part = null; break; }
@@ -135,20 +132,15 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
     var chip = chips[chipId]; if (!chip) return;
     var txt = chip.entity.text || chip.entity.label || '';
     var marker = '{{CHIP:' + chipId + '}}';
-    // Replace in all section contents
     setSections(function(secs) {
       return secs.map(function(s) {
         return Object.assign({}, s, { content: s.content.split(marker).join(txt) });
       });
     });
-    // Replace in all splits
     setSectionSplits(function(sp) {
       var n = Object.assign({}, sp);
       Object.keys(n).forEach(function(sid) {
-        n[sid] = {
-          top: n[sid].top.split(marker).join(txt),
-          bot: n[sid].bot.split(marker).join(txt),
-        };
+        n[sid] = { top: n[sid].top.split(marker).join(txt), bot: n[sid].bot.split(marker).join(txt) };
       });
       return n;
     });
@@ -178,8 +170,7 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
   }
 
   var popoverChip = popover && chips[popover.chipId] ?
-    { id: popover.chipId, entity: chips[popover.chipId].entity } :
-    null;
+    { id: popover.chipId, entity: chips[popover.chipId].entity } : null;
 
   // ----- drag-to-place helpers -----
   function combinedSection(sectionId) {
@@ -190,7 +181,6 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
     var sec = sections.find(function(s) { return s.id === sectionId; });
     return sec ? sec.content : '';
   }
-
   function blockGaps(wrap, sectionId, out) {
     if (!wrap) return;
     var blocks = [];
@@ -200,7 +190,6 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
     blocks.forEach(function(b, i) { out.push({ field: sectionId, k: i, vy: b.getBoundingClientRect().top }); });
     if (blocks.length) out.push({ field: sectionId, k: blocks.length, vy: blocks[blocks.length - 1].getBoundingClientRect().bottom });
   }
-
   function onHandleDown(e) {
     e.preventDefault();
     dragRef.current = { on: true };
@@ -209,7 +198,6 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
     window.addEventListener('pointermove', onDragMove);
     window.addEventListener('pointerup', onDragUp);
   }
-
   function onDragMove(e) {
     if (!dragRef.current.on) return;
     var dz = defaultZoneRef.current;
@@ -221,9 +209,7 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
     }
     var cands = [];
     var refs = sectionWrapRefs.current;
-    Object.keys(refs).forEach(function(sid) {
-      blockGaps(refs[sid], sid, cands);
-    });
+    Object.keys(refs).forEach(function(sid) { blockGaps(refs[sid], sid, cands); });
     if (!cands.length) { dropRef.current = { type: 'default' }; setDrop({ type: 'default' }); return; }
     var best = cands[0], bd = Math.abs(e.clientY - cands[0].vy);
     for (var i = 1; i < cands.length; i++) {
@@ -235,7 +221,6 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
     var res = { type: 'gap', field: best.field, k: best.k, y: best.vy - top };
     dropRef.current = res; setDrop(res);
   }
-
   function recombineCurrent() {
     if (toolLoc !== 'default') {
       var sid = toolLoc;
@@ -243,7 +228,6 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
       setSectionSplits(function(sp) { var n = Object.assign({}, sp); delete n[sid]; return n; });
     }
   }
-
   function onDragUp() {
     dragRef.current = { on: false };
     window.removeEventListener('pointermove', onDragMove);
@@ -262,18 +246,9 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
     dropRef.current = null;
     setDragging(false); setDrop(null);
   }
-
-  function closeTool() {
-    recombineCurrent(); setToolLoc('default');
-    setToolOpen(false);
-  }
-  function toggleTool() {
-    if (toolOpen) { closeTool(); } else { setToolOpen(true); }
-  }
-  function handleToolSelect(tool) {
-    setPickerOpen(false);
-    if (tool.hasTool) setToolOpen(true);
-  }
+  function closeTool() { recombineCurrent(); setToolLoc('default'); setToolOpen(false); }
+  function toggleTool() { if (toolOpen) { closeTool(); } else { setToolOpen(true); } }
+  function handleToolSelect(tool) { setPickerOpen(false); if (tool.hasTool) setToolOpen(true); }
 
   function onWrapKey(sectionId) {
     return function(e) {
@@ -296,19 +271,54 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
     };
   }
 
-  function removeSection(sectionId) {
-    setSectionSplits(function(sp) {
-      var n = Object.assign({}, sp); delete n[sectionId]; return n;
+  // ----- section reordering -----
+  function moveSectionUp(idx) {
+    if (idx === 0) return;
+    setSections(function(secs) {
+      var n = secs.slice();
+      var tmp = n[idx - 1]; n[idx - 1] = n[idx]; n[idx] = tmp;
+      return n;
     });
-    if (toolLoc === sectionId) setToolLoc('default');
-    setSections(function(secs) { return secs.filter(function(s) { return s.id !== sectionId; }); });
+  }
+  function moveSectionDown(idx) {
+    setSections(function(secs) {
+      if (idx >= secs.length - 1) return secs;
+      var n = secs.slice();
+      var tmp = n[idx + 1]; n[idx + 1] = n[idx]; n[idx] = tmp;
+      return n;
+    });
   }
 
+  // ----- tool zone position -----
+  function moveToolZoneUp() {
+    setToolZoneIndex(function(i) { return Math.max(0, i - 1); });
+  }
+  function moveToolZoneDown() {
+    setToolZoneIndex(function(i) { return Math.min(sections.length, i + 1); });
+  }
+
+  // ----- section add/remove -----
+  function removeSection(sectionId) {
+    var idx = sections.findIndex(function(s) { return s.id === sectionId; });
+    setSectionSplits(function(sp) { var n = Object.assign({}, sp); delete n[sectionId]; return n; });
+    if (toolLoc === sectionId) setToolLoc('default');
+    setSections(function(secs) { return secs.filter(function(s) { return s.id !== sectionId; }); });
+    // Ajuster toolZoneIndex si la section supprimée était avant la zone
+    if (idx >= 0 && toolZoneIndex > idx) {
+      setToolZoneIndex(function(i) { return Math.max(0, i - 1); });
+    }
+  }
   function addSection() {
     var id = 'sec-' + Date.now();
-    setSections(function(secs) {
-      return secs.concat([{ id: id, title: 'Nouvelle section', content: '' }]);
-    });
+    setSections(function(secs) { return secs.concat([{ id: id, title: 'Nouvelle section', content: '' }]); });
+  }
+
+  // ----- build interleaved items list -----
+  // sectionItems: array of { type:'section', sec, idx } | { type:'toolzone' }
+  var sectionItems = [];
+  for (var _si = 0; _si <= sections.length; _si++) {
+    if (_si === toolZoneIndex) sectionItems.push({ type: 'toolzone' });
+    if (_si < sections.length) sectionItems.push({ type: 'section', sec: sections[_si], idx: _si });
   }
 
   return (
@@ -371,14 +381,80 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
       {isOpen &&
         <div style={{ marginTop: 20, animation: 'note-expand 300ms ease-in-out' }}>
 
-          {/* Sections dynamiques */}
-          {sections.map(function(sec, idx) {
+          {sectionItems.map(function(item, renderIdx) {
+            var hasDividerBefore = renderIdx > 0;
+
+            if (item.type === 'toolzone') {
+              return (
+                React.createElement(React.Fragment, { key: 'toolzone' },
+                  hasDividerBefore ? React.createElement('div', { style: neStyles.divider }) : null,
+
+                  React.createElement('div', {
+                    ref: defaultZoneRef,
+                    className: 'ct-default-zone' + (dragging && drop && drop.type === 'default' ? ' is-target' : '')
+                  },
+                    /* Contrôles de déplacement de la zone */
+                    React.createElement('div', { style: neStyles.zoneControls },
+                      React.createElement('button', {
+                        style: Object.assign({}, neStyles.tbtn, toolZoneIndex === 0 ? { opacity: 0.25 } : {}),
+                        title: 'Remonter la zone d\'outils',
+                        disabled: toolZoneIndex === 0,
+                        onClick: moveToolZoneUp
+                      }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_upward')),
+                      React.createElement('button', {
+                        style: Object.assign({}, neStyles.tbtn, toolZoneIndex >= sections.length ? { opacity: 0.25 } : {}),
+                        title: 'Descendre la zone d\'outils',
+                        disabled: toolZoneIndex >= sections.length,
+                        onClick: moveToolZoneDown
+                      }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_downward'))
+                    ),
+
+                    React.createElement('div', { style: neStyles.chipsRow },
+                      React.createElement('button', {
+                        className: 'ct-toolsbtn',
+                        title: 'Outils cliniques',
+                        style: pickerOpen ? { background: '#eef1fb', color: 'var(--brand-primary, #1a5fd4)' } : undefined,
+                        onClick: function(e) {
+                          var r = e.currentTarget.getBoundingClientRect();
+                          if (pickerOpen) { setPickerOpen(false); } else { setPickerAnchor(r); setPickerOpen(true); }
+                        }
+                      }, React.createElement('span', { className: 'material-icons-outlined' }, 'handyman')),
+                      toolOpen
+                        ? React.createElement('button', { className: 'ct-chip', onClick: toggleTool },
+                            React.createElement('span', { className: 'material-icons-outlined' }, 'medical_information'),
+                            'Feuille de route - Symptômes urinaires'
+                          )
+                        : ['Assurance privée', 'Cardiologie', 'CNESST', 'Examen physique simple'].map(function(label) {
+                            return React.createElement('button', { key: label, className: 'ct-chip' },
+                              React.createElement('span', { className: 'material-icons-outlined' }, 'description'),
+                              label
+                            );
+                          })
+                    ),
+
+                    toolOpen && toolLoc === 'default'
+                      ? React.createElement(ClinicalTool, {
+                          onClose: closeTool,
+                          onHandleDown: onHandleDown,
+                          dragging: dragging,
+                          bodyCollapsed: toolBodyCollapsed,
+                          onBodyCollapseChange: setToolBodyCollapsed
+                        })
+                      : null
+                  )
+                )
+              );
+            }
+
+            // Section
+            var sec = item.sec;
+            var idx = item.idx;
             var sp = sectionSplits[sec.id] || { top: '', bot: '' };
             var isSplit = toolLoc === sec.id;
 
             return (
               React.createElement(React.Fragment, { key: sec.id },
-                idx > 0 ? React.createElement('div', { style: neStyles.divider }) : null,
+                hasDividerBefore ? React.createElement('div', { style: neStyles.divider }) : null,
 
                 /* En-tête de section */
                 React.createElement('div', { style: neStyles.secHead },
@@ -392,15 +468,31 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
                       });
                     }
                   }),
-                  sections.length > 1
-                    ? React.createElement('button', {
-                        style: neStyles.tbtn,
-                        title: 'Supprimer la section',
-                        onClick: function() { removeSection(sec.id); }
-                      },
-                      React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 18 } }, 'delete_outline')
-                    )
-                    : null
+                  React.createElement('div', { style: { display: 'flex', gap: 2, alignItems: 'center' } },
+                    /* Boutons de réordonnancement */
+                    sections.length > 1 && idx > 0
+                      ? React.createElement('button', {
+                          style: neStyles.tbtn,
+                          title: 'Remonter la section',
+                          onClick: function() { moveSectionUp(idx); }
+                        }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_upward'))
+                      : null,
+                    sections.length > 1 && idx < sections.length - 1
+                      ? React.createElement('button', {
+                          style: neStyles.tbtn,
+                          title: 'Descendre la section',
+                          onClick: function() { moveSectionDown(idx); }
+                        }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_downward'))
+                      : null,
+                    /* Bouton supprimer */
+                    sections.length > 1
+                      ? React.createElement('button', {
+                          style: neStyles.tbtn,
+                          title: 'Supprimer la section',
+                          onClick: function() { removeSection(sec.id); }
+                        }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 18 } }, 'delete_outline'))
+                      : null
+                  )
                 ),
 
                 /* Éditeur */
@@ -415,43 +507,32 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
                           ? React.createElement(EditorField, {
                               id: sec.id + '-top',
                               placeholder: 'Appuyer sur « / » pour afficher les commandes',
-                              value: sp.top,
-                              chips: chips,
+                              value: sp.top, chips: chips,
                               onChange: function(v) { setSplitTop(sec.id, v); },
-                              onAddChip: onAddChip,
-                              onChipClick: onChipClick,
-                              linkedChipId: linkedChipId
+                              onAddChip: onAddChip, onChipClick: onChipClick, linkedChipId: linkedChipId
                             })
                           : null,
                         toolOpen
                           ? React.createElement(ClinicalTool, {
-                              onClose: closeTool,
-                              onHandleDown: onHandleDown,
-                              dragging: dragging,
-                              bodyCollapsed: toolBodyCollapsed,
+                              onClose: closeTool, onHandleDown: onHandleDown,
+                              dragging: dragging, bodyCollapsed: toolBodyCollapsed,
                               onBodyCollapseChange: setToolBodyCollapsed
                             })
                           : null,
                         React.createElement(EditorField, {
                           id: sec.id + '-bot',
                           placeholder: 'Appuyer sur « / » pour afficher les commandes',
-                          value: sp.bot,
-                          chips: chips,
+                          value: sp.bot, chips: chips,
                           onChange: function(v) { setSplitBot(sec.id, v); },
-                          onAddChip: onAddChip,
-                          onChipClick: onChipClick,
-                          linkedChipId: linkedChipId
+                          onAddChip: onAddChip, onChipClick: onChipClick, linkedChipId: linkedChipId
                         })
                       )
                     : React.createElement(EditorField, {
                         id: sec.id,
                         placeholder: 'Appuyer sur « / » pour afficher les commandes',
-                        value: sec.content,
-                        chips: chips,
+                        value: sec.content, chips: chips,
                         onChange: function(v) { setSectionContent(sec.id, v); },
-                        onAddChip: onAddChip,
-                        onChipClick: onChipClick,
-                        linkedChipId: linkedChipId
+                        onAddChip: onAddChip, onChipClick: onChipClick, linkedChipId: linkedChipId
                       }),
                   dragging && drop && drop.type === 'gap' && drop.field === sec.id
                     ? React.createElement('div', { className: 'ct-dropline', style: { top: drop.y } })
@@ -460,41 +541,6 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
               )
             );
           })}
-
-          <div style={neStyles.divider} />
-
-          {/* Outils cliniques + position par défaut de l'outil */}
-          <div ref={defaultZoneRef} className={'ct-default-zone' + (dragging && drop && drop.type === 'default' ? ' is-target' : '')}>
-            <div style={neStyles.chipsRow}>
-              <button
-                className="ct-toolsbtn"
-                title="Outils cliniques"
-                style={pickerOpen ? { background: '#eef1fb', color: 'var(--brand-primary, #1a5fd4)' } : undefined}
-                onClick={function(e) {
-                  var r = e.currentTarget.getBoundingClientRect();
-                  if (pickerOpen) { setPickerOpen(false); } else { setPickerAnchor(r); setPickerOpen(true); }
-                }}>
-                <span className="material-icons-outlined">handyman</span>
-              </button>
-              {toolOpen &&
-                <button className="ct-chip" onClick={toggleTool}>
-                  <span className="material-icons-outlined">medical_information</span>
-                  Feuille de route - Symptômes urinaires
-                </button>
-              }
-              {!toolOpen && ['Assurance privée', 'Cardiologie', 'CNESST', 'Examen physique simple'].map(function(label) {
-                return (
-                  React.createElement('button', { key: label, className: 'ct-chip' },
-                    React.createElement('span', { className: 'material-icons-outlined' }, 'description'),
-                    label
-                  )
-                );
-              })}
-            </div>
-
-            {toolOpen && toolLoc === 'default' &&
-              <ClinicalTool onClose={closeTool} onHandleDown={onHandleDown} dragging={dragging} bodyCollapsed={toolBodyCollapsed} onBodyCollapseChange={setToolBodyCollapsed} />}
-          </div>
 
           <div style={neStyles.divider} />
 
@@ -538,10 +584,7 @@ function SectionTitle({ value, onChange }) {
   var _d = React.useState(value);
   var draft = _d[0], setDraft = _d[1];
 
-  function commit() {
-    if (draft.trim()) onChange(draft.trim());
-    setEditing(false);
-  }
+  function commit() { if (draft.trim()) onChange(draft.trim()); setEditing(false); }
 
   if (editing) {
     return React.createElement('input', {
@@ -666,6 +709,7 @@ const neStyles = {
   tbtn: { width: 28, height: 28, border: 0, background: 'transparent', borderRadius: 6, color: 'rgba(0,0,0,0.38)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   divider: { height: 1, background: '#eee', margin: '12px 0' },
   chipsRow: { display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', paddingBottom: 4 },
+  zoneControls: { display: 'flex', gap: 2, marginBottom: 4 },
   toolsIconBtn: { width: 36, height: 36, border: '1.5px solid rgba(0,0,0,0.18)', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   chip: { display: 'inline-flex', alignItems: 'center', border: '1.5px solid rgba(0,0,0,0.18)', borderRadius: 20, padding: '6px 14px', cursor: 'pointer', whiteSpace: 'nowrap', font: "500 13px 'Inter', sans-serif", color: 'rgba(0,0,0,0.72)', background: '#fff', flexShrink: 0 },
   addSectionBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: 'rgba(0,0,0,0.45)', font: "400 13px 'Inter', sans-serif", padding: '4px 0', borderRadius: 6 },
