@@ -1,7 +1,16 @@
 /* global React */
 function NoteEditor({ isOpen, onOpen, smartActive }) {
-  const [detail, setDetail] = React.useState('');
-  const [conclusion, setConclusion] = React.useState('');
+  const DEFAULT_SECTIONS = [
+    { id: 'sec-details',    title: 'Détails de la consultation', content: '' },
+    { id: 'sec-conclusion', title: 'Conclusion',                 content: '' },
+  ];
+
+  const [sections, setSections] = React.useState(
+    function() { return DEFAULT_SECTIONS.map(function(s) { return Object.assign({}, s); }); }
+  );
+  // splits pour drag-to-place: { [sectionId]: { top: '', bot: '' } }
+  const [sectionSplits, setSectionSplits] = React.useState({});
+
   const [chips, setChips] = React.useState({});
   const [popover, setPopover] = React.useState(null);
   const [linkedChipId, setLinkedChipId] = React.useState(null);
@@ -10,38 +19,58 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
   const [toolOpen, setToolOpen] = React.useState(false);
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [pickerAnchor, setPickerAnchor] = React.useState(null);
-  const [noteDate, setNoteDate] = React.useState(() => new Date().toISOString().slice(0, 10));
-  const [noteTime, setNoteTime] = React.useState(() => new Date().toTimeString().slice(0, 5));
+  const [noteDate, setNoteDate] = React.useState(function() { return new Date().toISOString().slice(0, 10); });
+  const [noteTime, setNoteTime] = React.useState(function() { return new Date().toTimeString().slice(0, 5); });
   const [visitType, setVisitType] = React.useState('Visite en clinique');
   const [showTags, setShowTags] = React.useState(false);
   const [tags, setTags] = React.useState([]);
 
+  const [toolBodyCollapsed, setToolBodyCollapsed] = React.useState(false);
+
   // --- drag-to-place tool state
-  const [detailTop, setDetailTop] = React.useState('');
-  const [detailBot, setDetailBot] = React.useState('');
-  const [conclusionTop, setConclusionTop] = React.useState('');
-  const [conclusionBot, setConclusionBot] = React.useState('');
-  const [toolLoc, setToolLoc] = React.useState('default'); // 'default' | 'detail' | 'conclusion'
+  // toolLoc: 'default' | sectionId
+  const [toolLoc, setToolLoc] = React.useState('default');
   const [dragging, setDragging] = React.useState(false);
-  const [drop, setDrop] = React.useState(null);            // null | {type:'default'} | {type:'gap',field,k,y}
-  const detailWrapRef = React.useRef(null);
-  const conclusionWrapRef = React.useRef(null);
+  const [drop, setDrop] = React.useState(null); // null | {type:'default'} | {type:'gap',field:sectionId,k,y}
+  const sectionWrapRefs = React.useRef({});
   const defaultZoneRef = React.useRef(null);
   const dragRef = React.useRef({ on: false });
   const dropRef = React.useRef(null);
 
-  React.useEffect(() => {
+  React.useEffect(function() {
     if (isOpen && !everOpened) setEverOpened(true);
   }, [isOpen]);
 
-  React.useEffect(() => {
+  React.useEffect(function() {
     function onPickerOpen(e) {
       setPickerAnchor(e.detail.rect);
       setPickerOpen(true);
     }
     window.addEventListener('ct-picker-open', onPickerOpen);
-    return () => window.removeEventListener('ct-picker-open', onPickerOpen);
+    return function() { window.removeEventListener('ct-picker-open', onPickerOpen); };
   }, []);
+
+  // ----- section content helpers -----
+  function setSectionContent(sectionId, valOrFn) {
+    setSections(function(secs) {
+      return secs.map(function(s) {
+        if (s.id !== sectionId) return s;
+        return Object.assign({}, s, { content: typeof valOrFn === 'function' ? valOrFn(s.content) : valOrFn });
+      });
+    });
+  }
+  function setSplitTop(sectionId, valOrFn) {
+    setSectionSplits(function(sp) {
+      const prev = sp[sectionId] || { top: '', bot: '' };
+      return Object.assign({}, sp, { [sectionId]: Object.assign({}, prev, { top: typeof valOrFn === 'function' ? valOrFn(prev.top) : valOrFn }) });
+    });
+  }
+  function setSplitBot(sectionId, valOrFn) {
+    setSectionSplits(function(sp) {
+      const prev = sp[sectionId] || { top: '', bot: '' };
+      return Object.assign({}, sp, { [sectionId]: Object.assign({}, prev, { bot: typeof valOrFn === 'function' ? valOrFn(prev.bot) : valOrFn }) });
+    });
+  }
 
   function deriveLabel(entity) {
     const d = entity.details || {};
@@ -59,25 +88,41 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
   }
 
   function onAddChip(fieldId, { chipId, entity, openAfter, storedOverride }) {
-    const set = fieldId === 'detail' ? setDetail : fieldId === 'detail-top' ? setDetailTop : fieldId === 'detail-bot' ? setDetailBot : fieldId === 'conclusion-top' ? setConclusionTop : fieldId === 'conclusion-bot' ? setConclusionBot : setConclusion;
-    if (storedOverride != null) set(storedOverride);
-    setChips(function (cs) {return Object.assign({}, cs, { [chipId]: { entity } });});
+    // Determine which section and part (null / 'top' / 'bot') the fieldId refers to
+    var targetSectionId = null, part = null;
+    // Use sections from current render — snapshot via a ref isn't needed here since
+    // this is called in event handlers where sections is closed over correctly.
+    // We iterate through the sections state we have.
+    // Note: sections may be stale in a closure; we rely on the fact that chip insertion
+    // always follows a user gesture on a rendered EditorField whose fieldId is valid.
+    for (var i = 0; i < sections.length; i++) {
+      var s = sections[i];
+      if (fieldId === s.id) { targetSectionId = s.id; part = null; break; }
+      if (fieldId === s.id + '-top') { targetSectionId = s.id; part = 'top'; break; }
+      if (fieldId === s.id + '-bot') { targetSectionId = s.id; part = 'bot'; break; }
+    }
+    if (storedOverride != null && targetSectionId) {
+      if (part === 'top') setSplitTop(targetSectionId, storedOverride);
+      else if (part === 'bot') setSplitBot(targetSectionId, storedOverride);
+      else setSectionContent(targetSectionId, storedOverride);
+    }
+    setChips(function(cs) { return Object.assign({}, cs, { [chipId]: { entity: entity } }); });
     if (openAfter) {
-      setTimeout(function () {
-        const node = document.querySelector('[data-cid="' + chipId + '"]');
-        if (node) setPopover({ chipId, anchorRect: node.getBoundingClientRect() });
+      setTimeout(function() {
+        var node = document.querySelector('[data-cid="' + chipId + '"]');
+        if (node) setPopover({ chipId: chipId, anchorRect: node.getBoundingClientRect() });
       }, 80);
     }
   }
 
   function onChipClick(chipId, rect) {
-    setPopover({ chipId, anchorRect: rect });
+    setPopover({ chipId: chipId, anchorRect: rect });
     setLinkedChipId(chipId);
   }
 
   function savePopover(chipId, draft) {
-    setChips(function (cs) {
-      const ent = Object.assign({}, draft, { label: deriveLabel(draft) });
+    setChips(function(cs) {
+      var ent = Object.assign({}, draft, { label: deriveLabel(draft) });
       if (ent.type === 'prescription' && ent.rx) ent.rx = window.NOTE_DATA.deriveRx(ent.details || {}, ent.rx);
       else if (ent.type === 'lab' && ent.rx) ent.rx = window.NOTE_DATA.deriveLabRx(ent.details || {});
       else if (ent.type === 'imaging' && ent.rx) ent.rx = window.NOTE_DATA.deriveImgRx(ent.details || {});
@@ -87,104 +132,137 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
   }
 
   function revertChip(chipId) {
-    const chip = chips[chipId];if (!chip) return;
-    const txt = chip.entity.text || chip.entity.label || '';
-    const marker = '{{CHIP:' + chipId + '}}';
-    setDetail(function (v) {return v.split(marker).join(txt);});
-    setDetailTop(function (v) {return v.split(marker).join(txt);});
-    setDetailBot(function (v) {return v.split(marker).join(txt);});
-    setConclusion(function (v) {return v.split(marker).join(txt);});
-    setConclusionTop(function (v) {return v.split(marker).join(txt);});
-    setConclusionBot(function (v) {return v.split(marker).join(txt);});
-    setChips(function (cs) {const n = Object.assign({}, cs);delete n[chipId];return n;});
+    var chip = chips[chipId]; if (!chip) return;
+    var txt = chip.entity.text || chip.entity.label || '';
+    var marker = '{{CHIP:' + chipId + '}}';
+    // Replace in all section contents
+    setSections(function(secs) {
+      return secs.map(function(s) {
+        return Object.assign({}, s, { content: s.content.split(marker).join(txt) });
+      });
+    });
+    // Replace in all splits
+    setSectionSplits(function(sp) {
+      var n = Object.assign({}, sp);
+      Object.keys(n).forEach(function(sid) {
+        n[sid] = {
+          top: n[sid].top.split(marker).join(txt),
+          bot: n[sid].bot.split(marker).join(txt),
+        };
+      });
+      return n;
+    });
+    setChips(function(cs) { var n = Object.assign({}, cs); delete n[chipId]; return n; });
     setPopover(null);
   }
 
   function deleteChip(chipId) {
-    const marker = '{{CHIP:' + chipId + '}}';
-    setDetail(function (v) {return v.split(marker + ' ').join('').split(marker).join('');});
-    setDetailTop(function (v) {return v.split(marker + ' ').join('').split(marker).join('');});
-    setDetailBot(function (v) {return v.split(marker + ' ').join('').split(marker).join('');});
-    setConclusion(function (v) {return v.split(marker + ' ').join('').split(marker).join('');});
-    setConclusionTop(function (v) {return v.split(marker + ' ').join('').split(marker).join('');});
-    setConclusionBot(function (v) {return v.split(marker + ' ').join('').split(marker).join('');});
-    setChips(function (cs) {const n = Object.assign({}, cs);delete n[chipId];return n;});
+    var marker = '{{CHIP:' + chipId + '}}';
+    setSections(function(secs) {
+      return secs.map(function(s) {
+        return Object.assign({}, s, { content: s.content.split(marker + ' ').join('').split(marker).join('') });
+      });
+    });
+    setSectionSplits(function(sp) {
+      var n = Object.assign({}, sp);
+      Object.keys(n).forEach(function(sid) {
+        n[sid] = {
+          top: n[sid].top.split(marker + ' ').join('').split(marker).join(''),
+          bot: n[sid].bot.split(marker + ' ').join('').split(marker).join(''),
+        };
+      });
+      return n;
+    });
+    setChips(function(cs) { var n = Object.assign({}, cs); delete n[chipId]; return n; });
     setPopover(null);
   }
 
-  const popoverChip = popover && chips[popover.chipId] ?
-  { id: popover.chipId, entity: chips[popover.chipId].entity } :
-  null;
+  var popoverChip = popover && chips[popover.chipId] ?
+    { id: popover.chipId, entity: chips[popover.chipId].entity } :
+    null;
 
   // ----- drag-to-place helpers -----
-  function combinedDetail() {
-    return toolLoc === 'detail' ? (detailTop + (detailTop && detailBot ? '\n' : '') + detailBot) : detail;
+  function combinedSection(sectionId) {
+    if (toolLoc === sectionId) {
+      var sp = sectionSplits[sectionId] || { top: '', bot: '' };
+      return sp.top + (sp.top && sp.bot ? '\n' : '') + sp.bot;
+    }
+    var sec = sections.find(function(s) { return s.id === sectionId; });
+    return sec ? sec.content : '';
   }
-  function combinedConclusion() {
-    return toolLoc === 'conclusion' ? (conclusionTop + (conclusionTop && conclusionBot ? '\n' : '') + conclusionBot) : conclusion;
-  }
-  function blockGaps(wrap, field, out) {
+
+  function blockGaps(wrap, sectionId, out) {
     if (!wrap) return;
-    let blocks = [];
-    wrap.querySelectorAll('.ql-editor').forEach(function (ed) {
-      blocks = blocks.concat([].slice.call(ed.children).filter(function (n) { return n.nodeType === 1; }));
+    var blocks = [];
+    wrap.querySelectorAll('.ql-editor').forEach(function(ed) {
+      blocks = blocks.concat([].slice.call(ed.children).filter(function(n) { return n.nodeType === 1; }));
     });
-    blocks.forEach(function (b, i) { out.push({ field: field, k: i, vy: b.getBoundingClientRect().top }); });
-    if (blocks.length) out.push({ field: field, k: blocks.length, vy: blocks[blocks.length - 1].getBoundingClientRect().bottom });
+    blocks.forEach(function(b, i) { out.push({ field: sectionId, k: i, vy: b.getBoundingClientRect().top }); });
+    if (blocks.length) out.push({ field: sectionId, k: blocks.length, vy: blocks[blocks.length - 1].getBoundingClientRect().bottom });
   }
+
   function onHandleDown(e) {
     e.preventDefault();
     dragRef.current = { on: true };
     setDragging(true);
+    setToolBodyCollapsed(true);
     window.addEventListener('pointermove', onDragMove);
     window.addEventListener('pointerup', onDragUp);
   }
+
   function onDragMove(e) {
     if (!dragRef.current.on) return;
-    const dz = defaultZoneRef.current;
+    var dz = defaultZoneRef.current;
     if (dz) {
-      const r = dz.getBoundingClientRect();
-      if (e.clientY >= r.top && e.clientY <= r.bottom) { dropRef.current = { type: 'default' }; setDrop({ type: 'default' }); return; }
+      var r = dz.getBoundingClientRect();
+      if (e.clientY >= r.top && e.clientY <= r.bottom) {
+        dropRef.current = { type: 'default' }; setDrop({ type: 'default' }); return;
+      }
     }
-    const cands = [];
-    blockGaps(detailWrapRef.current, 'detail', cands);
-    blockGaps(conclusionWrapRef.current, 'conclusion', cands);
+    var cands = [];
+    var refs = sectionWrapRefs.current;
+    Object.keys(refs).forEach(function(sid) {
+      blockGaps(refs[sid], sid, cands);
+    });
     if (!cands.length) { dropRef.current = { type: 'default' }; setDrop({ type: 'default' }); return; }
-    let best = cands[0], bd = Math.abs(e.clientY - cands[0].vy);
-    for (let i = 1; i < cands.length; i++) { const d = Math.abs(e.clientY - cands[i].vy); if (d < bd) { bd = d; best = cands[i]; } }
-    const ref = best.field === 'detail' ? detailWrapRef : conclusionWrapRef;
-    const top = ref.current.getBoundingClientRect().top;
-    const res = { type: 'gap', field: best.field, k: best.k, y: best.vy - top };
+    var best = cands[0], bd = Math.abs(e.clientY - cands[0].vy);
+    for (var i = 1; i < cands.length; i++) {
+      var d = Math.abs(e.clientY - cands[i].vy);
+      if (d < bd) { bd = d; best = cands[i]; }
+    }
+    var wrapEl = refs[best.field];
+    var top = wrapEl ? wrapEl.getBoundingClientRect().top : 0;
+    var res = { type: 'gap', field: best.field, k: best.k, y: best.vy - top };
     dropRef.current = res; setDrop(res);
   }
+
   function recombineCurrent() {
-    if (toolLoc === 'detail') setDetail(combinedDetail());
-    else if (toolLoc === 'conclusion') setConclusion(combinedConclusion());
+    if (toolLoc !== 'default') {
+      var sid = toolLoc;
+      setSectionContent(sid, combinedSection(sid));
+      setSectionSplits(function(sp) { var n = Object.assign({}, sp); delete n[sid]; return n; });
+    }
   }
+
   function onDragUp() {
     dragRef.current = { on: false };
     window.removeEventListener('pointermove', onDragMove);
     window.removeEventListener('pointerup', onDragUp);
-    const t = dropRef.current;
+    var t = dropRef.current;
     if (t && t.type === 'default') {
       recombineCurrent(); setToolLoc('default');
     } else if (t && t.type === 'gap') {
       recombineCurrent();
-      if (t.field === 'detail') {
-        const P = combinedDetail().split('\n');
-        setDetailTop(P.slice(0, t.k).join('\n'));
-        setDetailBot(P.slice(t.k).join('\n'));
-        setToolLoc('detail');
-      } else {
-        const P = combinedConclusion().split('\n');
-        setConclusionTop(P.slice(0, t.k).join('\n'));
-        setConclusionBot(P.slice(t.k).join('\n'));
-        setToolLoc('conclusion');
-      }
+      var sid = t.field;
+      var P = combinedSection(sid).split('\n');
+      setSplitTop(sid, P.slice(0, t.k).join('\n'));
+      setSplitBot(sid, P.slice(t.k).join('\n'));
+      setToolLoc(sid);
     }
     dropRef.current = null;
     setDragging(false); setDrop(null);
   }
+
   function closeTool() {
     recombineCurrent(); setToolLoc('default');
     setToolOpen(false);
@@ -196,25 +274,41 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
     setPickerOpen(false);
     if (tool.hasTool) setToolOpen(true);
   }
-  function onWrapKey(field) {
-    return function (e) {
+
+  function onWrapKey(sectionId) {
+    return function(e) {
       if (e.defaultPrevented) return;
       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
-      const topEl = document.querySelector('[data-field-id="' + field + '-top"]');
-      const botEl = document.querySelector('[data-field-id="' + field + '-bot"]');
+      var topEl = document.querySelector('[data-field-id="' + sectionId + '-top"]');
+      var botEl = document.querySelector('[data-field-id="' + sectionId + '-bot"]');
       if (!topEl || !botEl || !window.Quill) return;
-      const topQ = Quill.find(topEl), botQ = Quill.find(botEl);
+      var topQ = Quill.find(topEl), botQ = Quill.find(botEl);
       if (!topQ || !botQ) return;
-      const inTop = e.target.closest && e.target.closest('[data-field-id="' + field + '-top"]');
-      const inBot = e.target.closest && e.target.closest('[data-field-id="' + field + '-bot"]');
+      var inTop = e.target.closest && e.target.closest('[data-field-id="' + sectionId + '-top"]');
+      var inBot = e.target.closest && e.target.closest('[data-field-id="' + sectionId + '-bot"]');
       if (inTop && (e.key === 'ArrowDown' || e.key === 'ArrowRight')) {
-        const sel = topQ.getSelection();
+        var sel = topQ.getSelection();
         if (sel && sel.index >= topQ.getLength() - 1) { e.preventDefault(); botQ.focus(); botQ.setSelection(0, 0); }
       } else if (inBot && (e.key === 'ArrowUp' || e.key === 'ArrowLeft')) {
-        const sel = botQ.getSelection();
-        if (sel && sel.index === 0) { e.preventDefault(); const len = topQ.getLength(); topQ.focus(); topQ.setSelection(Math.max(0, len - 1), 0); }
+        var sel2 = botQ.getSelection();
+        if (sel2 && sel2.index === 0) { e.preventDefault(); var len = topQ.getLength(); topQ.focus(); topQ.setSelection(Math.max(0, len - 1), 0); }
       }
     };
+  }
+
+  function removeSection(sectionId) {
+    setSectionSplits(function(sp) {
+      var n = Object.assign({}, sp); delete n[sectionId]; return n;
+    });
+    if (toolLoc === sectionId) setToolLoc('default');
+    setSections(function(secs) { return secs.filter(function(s) { return s.id !== sectionId; }); });
+  }
+
+  function addSection() {
+    var id = 'sec-' + Date.now();
+    setSections(function(secs) {
+      return secs.concat([{ id: id, title: 'Nouvelle section', content: '' }]);
+    });
   }
 
   return (
@@ -244,7 +338,7 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
 
       {/* Fields */}
       <div style={neStyles.fieldsRow}>
-        <FloatField label="Raison de consultation" flex input onValueChange={function (v) {if (v.length > 0 && onOpen) onOpen();}} />
+        <FloatField label="Raison de consultation" flex input onValueChange={function(v) { if (v.length > 0 && onOpen) onOpen(); }} />
         <FloatField label="Date" width={210} input type="date" value={noteDate} onValueChange={setNoteDate} />
         <FloatField label="Heure" width={170} input type="time" value={noteTime} onValueChange={setNoteTime} />
         <FloatField label="Type de visite" width={260} select value={visitType} onValueChange={setVisitType} options={['Visite en clinique', 'Appel téléphonique', 'Mise à jour']} />
@@ -252,43 +346,120 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
           type="button"
           title={showTags ? "Masquer les étiquettes" : "Ajouter des étiquettes"}
           aria-pressed={showTags}
-          onClick={function () { setShowTags(function (v) { return !v; }); }}
-          style={{ ...neStyles.tagToggle, ...(showTags ? neStyles.tagToggleOn : {}) }}>
+          onClick={function() { setShowTags(function(v) { return !v; }); }}
+          style={Object.assign({}, neStyles.tagToggle, showTags ? neStyles.tagToggleOn : {})}>
           <span className="material-icons-outlined" style={{ fontSize: 22 }}>sell</span>
         </button>
       </div>
 
       {/* Étiquettes */}
-      {showTags &&
-        <TagInput tags={tags} onChange={setTags} />}
+      {showTags && <TagInput tags={tags} onChange={setTags} />}
 
       {/* Assistant IA */}
-      <AIBox onAddToNote={function (text) {
+      <AIBox onAddToNote={function(text) {
         if (onOpen) onOpen();
-        setDetail(function (v) { return v && v.trim() ? v.replace(/\n*$/, '') + '\n\n' + text : text; });
+        setSections(function(secs) {
+          return secs.map(function(s, i) {
+            if (i !== 0) return s;
+            var v = s.content;
+            return Object.assign({}, s, { content: v && v.trim() ? v.replace(/\n*$/, '') + '\n\n' + text : text });
+          });
+        });
       }} />
 
       {/* Expanding content */}
       {isOpen &&
-      <div style={{ marginTop: 20, animation: 'note-expand 300ms ease-in-out' }}>
+        <div style={{ marginTop: 20, animation: 'note-expand 300ms ease-in-out' }}>
 
-          {/* Détails */}
-          <div style={neStyles.secHead}>
-            <span style={neStyles.sectionLabel}>Détails</span>
-          </div>
-<div ref={detailWrapRef} onKeyDown={onWrapKey('detail')} style={{ position: "relative" }}>
-            {toolLoc === "detail" ? (
-              <React.Fragment>
-                {detailTop.trim() !== "" && <EditorField id="detail-top" placeholder="Appuyer sur « / » pour afficher les commandes" value={detailTop} chips={chips} onChange={setDetailTop} onAddChip={onAddChip} onChipClick={onChipClick} linkedChipId={linkedChipId} />}
-                {toolOpen && <ClinicalTool onClose={closeTool} onHandleDown={onHandleDown} dragging={dragging} />}
-                <EditorField id="detail-bot" placeholder="Appuyer sur « / » pour afficher les commandes" value={detailBot} chips={chips} onChange={setDetailBot} onAddChip={onAddChip} onChipClick={onChipClick} linkedChipId={linkedChipId} />
-              </React.Fragment>
-            ) : (
-              <EditorField id="detail" placeholder="Appuyer sur « / » pour afficher les commandes" value={detail} chips={chips} onChange={setDetail} onAddChip={onAddChip} onChipClick={onChipClick} linkedChipId={linkedChipId} />
-            )}
-            {dragging && drop && drop.type === "gap" && drop.field === "detail" && <div className="ct-dropline" style={{ top: drop.y }} />}
-          </div>
-          
+          {/* Sections dynamiques */}
+          {sections.map(function(sec, idx) {
+            var sp = sectionSplits[sec.id] || { top: '', bot: '' };
+            var isSplit = toolLoc === sec.id;
+
+            return (
+              React.createElement(React.Fragment, { key: sec.id },
+                idx > 0 ? React.createElement('div', { style: neStyles.divider }) : null,
+
+                /* En-tête de section */
+                React.createElement('div', { style: neStyles.secHead },
+                  React.createElement(SectionTitle, {
+                    value: sec.title,
+                    onChange: function(newTitle) {
+                      setSections(function(secs) {
+                        return secs.map(function(s) {
+                          return s.id === sec.id ? Object.assign({}, s, { title: newTitle }) : s;
+                        });
+                      });
+                    }
+                  }),
+                  sections.length > 1
+                    ? React.createElement('button', {
+                        style: neStyles.tbtn,
+                        title: 'Supprimer la section',
+                        onClick: function() { removeSection(sec.id); }
+                      },
+                      React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 18 } }, 'delete_outline')
+                    )
+                    : null
+                ),
+
+                /* Éditeur */
+                React.createElement('div', {
+                  ref: function(el) { sectionWrapRefs.current[sec.id] = el; },
+                  onKeyDown: onWrapKey(sec.id),
+                  style: { position: 'relative' }
+                },
+                  isSplit
+                    ? React.createElement(React.Fragment, null,
+                        sp.top.trim() !== ''
+                          ? React.createElement(EditorField, {
+                              id: sec.id + '-top',
+                              placeholder: 'Appuyer sur « / » pour afficher les commandes',
+                              value: sp.top,
+                              chips: chips,
+                              onChange: function(v) { setSplitTop(sec.id, v); },
+                              onAddChip: onAddChip,
+                              onChipClick: onChipClick,
+                              linkedChipId: linkedChipId
+                            })
+                          : null,
+                        toolOpen
+                          ? React.createElement(ClinicalTool, {
+                              onClose: closeTool,
+                              onHandleDown: onHandleDown,
+                              dragging: dragging,
+                              bodyCollapsed: toolBodyCollapsed,
+                              onBodyCollapseChange: setToolBodyCollapsed
+                            })
+                          : null,
+                        React.createElement(EditorField, {
+                          id: sec.id + '-bot',
+                          placeholder: 'Appuyer sur « / » pour afficher les commandes',
+                          value: sp.bot,
+                          chips: chips,
+                          onChange: function(v) { setSplitBot(sec.id, v); },
+                          onAddChip: onAddChip,
+                          onChipClick: onChipClick,
+                          linkedChipId: linkedChipId
+                        })
+                      )
+                    : React.createElement(EditorField, {
+                        id: sec.id,
+                        placeholder: 'Appuyer sur « / » pour afficher les commandes',
+                        value: sec.content,
+                        chips: chips,
+                        onChange: function(v) { setSectionContent(sec.id, v); },
+                        onAddChip: onAddChip,
+                        onChipClick: onChipClick,
+                        linkedChipId: linkedChipId
+                      }),
+                  dragging && drop && drop.type === 'gap' && drop.field === sec.id
+                    ? React.createElement('div', { className: 'ct-dropline', style: { top: drop.y } })
+                    : null
+                )
+              )
+            );
+          })}
 
           <div style={neStyles.divider} />
 
@@ -299,8 +470,8 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
                 className="ct-toolsbtn"
                 title="Outils cliniques"
                 style={pickerOpen ? { background: '#eef1fb', color: 'var(--brand-primary, #1a5fd4)' } : undefined}
-                onClick={function (e) {
-                  const r = e.currentTarget.getBoundingClientRect();
+                onClick={function(e) {
+                  var r = e.currentTarget.getBoundingClientRect();
                   if (pickerOpen) { setPickerOpen(false); } else { setPickerAnchor(r); setPickerOpen(true); }
                 }}>
                 <span className="material-icons-outlined">handyman</span>
@@ -311,64 +482,92 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
                   Feuille de route - Symptômes urinaires
                 </button>
               }
-              {!toolOpen && ['Assurance privée', 'Cardiologie', 'CNESST', 'Examen physique simple'].map(function (label) {
+              {!toolOpen && ['Assurance privée', 'Cardiologie', 'CNESST', 'Examen physique simple'].map(function(label) {
                 return (
-                  <button key={label} className="ct-chip">
-                    <span className="material-icons-outlined">description</span>
-                    {label}
-                  </button>
+                  React.createElement('button', { key: label, className: 'ct-chip' },
+                    React.createElement('span', { className: 'material-icons-outlined' }, 'description'),
+                    label
+                  )
                 );
               })}
             </div>
 
-            {toolOpen && toolLoc === "default" &&
-              <ClinicalTool onClose={closeTool} onHandleDown={onHandleDown} dragging={dragging} />}
+            {toolOpen && toolLoc === 'default' &&
+              <ClinicalTool onClose={closeTool} onHandleDown={onHandleDown} dragging={dragging} bodyCollapsed={toolBodyCollapsed} onBodyCollapseChange={setToolBodyCollapsed} />}
           </div>
 
           <div style={neStyles.divider} />
 
-          {/* Conclusion */}
-          <div style={neStyles.secHead}>
-            <span style={neStyles.sectionLabel}>Conclusion</span>
-          </div>
-<div ref={conclusionWrapRef} onKeyDown={onWrapKey('conclusion')} style={{ position: "relative" }}>
-            {toolLoc === "conclusion" ? (
-              <React.Fragment>
-                {conclusionTop.trim() !== "" && <EditorField id="conclusion-top" placeholder="Appuyer sur « / » pour afficher les commandes" value={conclusionTop} chips={chips} onChange={setConclusionTop} onAddChip={onAddChip} onChipClick={onChipClick} linkedChipId={linkedChipId} />}
-                {toolOpen && <ClinicalTool onClose={closeTool} onHandleDown={onHandleDown} dragging={dragging} />}
-                <EditorField id="conclusion-bot" placeholder="Appuyer sur « / » pour afficher les commandes" value={conclusionBot} chips={chips} onChange={setConclusionBot} onAddChip={onAddChip} onChipClick={onChipClick} linkedChipId={linkedChipId} />
-              </React.Fragment>
-            ) : (
-              <EditorField id="conclusion" placeholder="Appuyer sur « / » pour afficher les commandes" value={conclusion} chips={chips} onChange={setConclusion} onAddChip={onAddChip} onChipClick={onChipClick} linkedChipId={linkedChipId} />
-            )}
-            {dragging && drop && drop.type === "gap" && drop.field === "conclusion" && <div className="ct-dropline" style={{ top: drop.y }} />}
-          </div>
-          
+          {/* Ajouter une section */}
+          <button style={neStyles.addSectionBtn} onClick={addSection}>
+            <span className="material-icons-outlined" style={{ fontSize: 18 }}>add</span>
+            Ajouter une section
+          </button>
 
-          </div>
+        </div>
       }
 
       {/* Clinical tool picker */}
       {pickerOpen &&
         <ClinicalToolPicker
           anchorRect={pickerAnchor}
-          onClose={function () { setPickerOpen(false); }}
+          onClose={function() { setPickerOpen(false); }}
           onSelect={handleToolSelect} />
       }
 
       {/* Chip popover */}
       {popoverChip &&
-      <ChipPopover
-        chip={popoverChip}
-        anchorRect={popover.anchorRect}
-        onClose={function () {setPopover(null);setLinkedChipId(null);}}
-        onSave={savePopover}
-        onRevert={revertChip}
-        onDelete={deleteChip} />
-
+        <ChipPopover
+          chip={popoverChip}
+          anchorRect={popover.anchorRect}
+          onClose={function() { setPopover(null); setLinkedChipId(null); }}
+          onSave={savePopover}
+          onRevert={revertChip}
+          onDelete={deleteChip} />
       }
-    </div>);
+    </div>
+  );
+}
 
+// ---------------------------------------------------------
+// SectionTitle — titre de section éditable inline
+// ---------------------------------------------------------
+function SectionTitle({ value, onChange }) {
+  var _s = React.useState(false);
+  var editing = _s[0], setEditing = _s[1];
+  var _d = React.useState(value);
+  var draft = _d[0], setDraft = _d[1];
+
+  function commit() {
+    if (draft.trim()) onChange(draft.trim());
+    setEditing(false);
+  }
+
+  if (editing) {
+    return React.createElement('input', {
+      autoFocus: true,
+      style: neStyles.secTitleInput,
+      value: draft,
+      onChange: function(e) { setDraft(e.target.value); },
+      onBlur: commit,
+      onKeyDown: function(e) {
+        if (e.key === 'Enter') commit();
+        if (e.key === 'Escape') setEditing(false);
+      }
+    });
+  }
+
+  return React.createElement('span', {
+    style: Object.assign({}, neStyles.sectionLabel, neStyles.sectionLabelEditable),
+    title: 'Cliquer pour renommer',
+    onClick: function() { setDraft(value); setEditing(true); }
+  },
+    value,
+    React.createElement('span', {
+      className: 'material-icons-outlined',
+      style: { fontSize: 13, marginLeft: 5, opacity: 0.35, verticalAlign: 'middle' }
+    }, 'edit')
+  );
 }
 
 function FloatField({ label, children, width, flex, error, input, type, select, options, value: controlledValue, onValueChange }) {
@@ -405,9 +604,9 @@ function FloatField({ label, children, width, flex, error, input, type, select, 
               style={{ ...neFieldStyles.input, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}
               value={value}
               onChange={handleChange}
-              onFocus={function () { setFocused(true); }}
-              onBlur={function () { setFocused(false); }}>
-              {(options || []).map(function (o) { return <option key={o} value={o}>{o}</option>; })}
+              onFocus={function() { setFocused(true); }}
+              onBlur={function() { setFocused(false); }}>
+              {(options || []).map(function(o) { return <option key={o} value={o}>{o}</option>; })}
             </select>
             <span className="material-icons-outlined" style={neStyles.fieldIcon}>arrow_drop_down</span>
           </React.Fragment>
@@ -417,12 +616,11 @@ function FloatField({ label, children, width, flex, error, input, type, select, 
             type={type || 'text'}
             value={value}
             onChange={handleChange}
-            onFocus={function () { setFocused(true); }}
-            onBlur={function () { setFocused(false); }} />
+            onFocus={function() { setFocused(true); }}
+            onBlur={function() { setFocused(false); }} />
         ) : children}
       </div>
     </div>);
-
 }
 
 const neFieldStyles = {
@@ -461,13 +659,16 @@ const neStyles = {
   aiActionIcon: { fontSize: 20, color: 'rgba(0,0,0,0.6)' },
   infoIcon: { fontSize: 22, color: 'rgba(0,0,0,0.4)', cursor: 'pointer' },
   secHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 8, marginBottom: 4 },
-  sectionLabel: { fontSize: 14, fontWeight: 400, fontFamily: "'Inter',sans-serif", color: 'rgba(0,0,0,0.6)' },
+  sectionLabel: { fontSize: 14, fontWeight: 400, fontFamily: "'Inter',sans-serif", color: 'rgba(0,0,0,0.6)', cursor: 'default' },
+  sectionLabelEditable: { cursor: 'pointer', display: 'inline-flex', alignItems: 'center' },
+  secTitleInput: { fontSize: 14, fontWeight: 400, fontFamily: "'Inter',sans-serif", color: 'rgba(0,0,0,0.8)', border: 'none', borderBottom: '1px solid #6967d1', outline: 'none', background: 'transparent', padding: '0 2px', minWidth: 180 },
   secTools: { display: 'flex', gap: 2 },
-  tbtn: { width: 28, height: 28, border: 0, background: 'transparent', borderRadius: 6, color: 'rgba(0,0,0,0.45)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+  tbtn: { width: 28, height: 28, border: 0, background: 'transparent', borderRadius: 6, color: 'rgba(0,0,0,0.38)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   divider: { height: 1, background: '#eee', margin: '12px 0' },
   chipsRow: { display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', paddingBottom: 4 },
   toolsIconBtn: { width: 36, height: 36, border: '1.5px solid rgba(0,0,0,0.18)', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  chip: { display: 'inline-flex', alignItems: 'center', border: '1.5px solid rgba(0,0,0,0.18)', borderRadius: 20, padding: '6px 14px', cursor: 'pointer', whiteSpace: 'nowrap', font: "500 13px 'Inter', sans-serif", color: 'rgba(0,0,0,0.72)', background: '#fff', flexShrink: 0 }
+  chip: { display: 'inline-flex', alignItems: 'center', border: '1.5px solid rgba(0,0,0,0.18)', borderRadius: 20, padding: '6px 14px', cursor: 'pointer', whiteSpace: 'nowrap', font: "500 13px 'Inter', sans-serif", color: 'rgba(0,0,0,0.72)', background: '#fff', flexShrink: 0 },
+  addSectionBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: 'rgba(0,0,0,0.45)', font: "400 13px 'Inter', sans-serif", padding: '4px 0', borderRadius: 6 },
 };
 
 window.NoteEditor = NoteEditor;
@@ -485,19 +686,19 @@ function TagInput({ tags, onChange }) {
   function addTag(raw) {
     const t = (raw || '').trim();
     if (!t) return;
-    if (tags.some(function (x) { return x.toLowerCase() === t.toLowerCase(); })) { setInput(''); return; }
+    if (tags.some(function(x) { return x.toLowerCase() === t.toLowerCase(); })) { setInput(''); return; }
     onChange(tags.concat([t]));
     setInput('');
   }
-  function removeTag(i) { onChange(tags.filter(function (_, k) { return k !== i; })); }
+  function removeTag(i) { onChange(tags.filter(function(_, k) { return k !== i; })); }
 
   function onKeyDown(e) {
     if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(input); }
     else if (e.key === 'Backspace' && input === '' && tags.length) { e.preventDefault(); removeTag(tags.length - 1); }
   }
 
-  const suggestions = TAG_SUGGESTIONS.filter(function (s) {
-    return !tags.some(function (t) { return t.toLowerCase() === s.toLowerCase(); }) &&
+  const suggestions = TAG_SUGGESTIONS.filter(function(s) {
+    return !tags.some(function(t) { return t.toLowerCase() === s.toLowerCase(); }) &&
       (input.trim() === '' || s.toLowerCase().includes(input.trim().toLowerCase()));
   }).slice(0, 6);
 
@@ -505,15 +706,15 @@ function TagInput({ tags, onChange }) {
     <div style={tagStyles.row}>
       <div
         style={{ ...tagStyles.wrap, ...(focused ? tagStyles.wrapFocused : {}) }}
-        onMouseDown={function (e) { if (e.target === e.currentTarget || e.target.dataset.tagshell) { inputRef.current && inputRef.current.focus(); } }}>
+        onMouseDown={function(e) { if (e.target === e.currentTarget || e.target.dataset.tagshell) { inputRef.current && inputRef.current.focus(); } }}>
         <span style={{ ...neFieldStyles.label, ...neFieldStyles.labelFloating, ...(focused ? { color: '#6967d1' } : {}) }}>Étiquettes</span>
         <div style={tagStyles.inner} data-tagshell="1">
           <span className="material-icons-outlined" style={tagStyles.icon}>sell</span>
-          {tags.map(function (t, i) {
+          {tags.map(function(t, i) {
             return (
               <span key={t + i} style={tagStyles.chip}>
                 {t}
-                <button type="button" style={tagStyles.chipX} title="Retirer" onClick={function () { removeTag(i); }}>
+                <button type="button" style={tagStyles.chipX} title="Retirer" onClick={function() { removeTag(i); }}>
                   <span className="material-icons" style={{ fontSize: 16 }}>close</span>
                 </button>
               </span>);
@@ -523,19 +724,19 @@ function TagInput({ tags, onChange }) {
             style={tagStyles.input}
             value={input}
             placeholder={tags.length ? 'Ajouter…' : 'Ajouter une étiquette…'}
-            onChange={function (e) { setInput(e.target.value); }}
+            onChange={function(e) { setInput(e.target.value); }}
             onKeyDown={onKeyDown}
-            onFocus={function () { setFocused(true); }}
-            onBlur={function () { setTimeout(function () { setFocused(false); }, 120); }} />
+            onFocus={function() { setFocused(true); }}
+            onBlur={function() { setTimeout(function() { setFocused(false); }, 120); }} />
         </div>
         {focused && suggestions.length > 0 &&
           <div style={tagStyles.menu}>
-            {suggestions.map(function (s) {
+            {suggestions.map(function(s) {
               return (
                 <div key={s} style={tagStyles.menuItem}
-                  onMouseEnter={function (e) { e.currentTarget.style.background = '#f3f2fb'; }}
-                  onMouseLeave={function (e) { e.currentTarget.style.background = 'transparent'; }}
-                  onMouseDown={function (e) { e.preventDefault(); addTag(s); inputRef.current && inputRef.current.focus(); }}>
+                  onMouseEnter={function(e) { e.currentTarget.style.background = '#f3f2fb'; }}
+                  onMouseLeave={function(e) { e.currentTarget.style.background = 'transparent'; }}
+                  onMouseDown={function(e) { e.preventDefault(); addTag(s); inputRef.current && inputRef.current.focus(); }}>
                   <span className="material-icons-outlined" style={{ fontSize: 16, color: 'rgba(0,0,0,0.4)' }}>sell</span>
                   {s}
                 </div>);
