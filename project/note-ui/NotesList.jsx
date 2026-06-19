@@ -134,7 +134,7 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
                 </div>
               )}
 
-              {/* Diagnostics */}
+              {/* Diagnostics — always visible (collapsed only shows these) */}
               {n.diagnostics && n.diagnostics.length > 0 && (
                 <div style={nlStyles.diagRow}>
                   {n.diagnostics.map((d, j) => (
@@ -146,14 +146,11 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
                 </div>
               )}
 
-              {/* Conclusion */}
-              {n.conclusion ? (
+              {/* Conclusion — only when expanded */}
+              {isOpen && n.conclusion ? (
                 <>
                   <div style={nlStyles.conclLabelWrap}>
-                    {isOpen
-                      ? <div style={nlStyles.conclLabelOpen}>Conclusion</div>
-                      : <div style={nlStyles.conclLabel}>CONCLUSION</div>
-                    }
+                    <div style={nlStyles.conclLabelOpen}>Conclusion</div>
                   </div>
                   <div style={nlStyles.conclText}>
                     {n.conclusion.split("\n").map((line, j) => (
@@ -163,16 +160,18 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
                 </>
               ) : null}
 
-              {/* Files */}
-              <div style={nlStyles.fileRow}>
-                {n.files.map((f) => (
-                  <span key={f.name} style={nlStyles.fileChip}>
-                    <span className="material-icons-outlined" style={nlStyles.clipIcon}>attach_file</span>
-                    <span style={nlStyles.fileName}>{f.name}</span>
-                    <span style={nlStyles.fileSize}>{f.size}</span>
-                  </span>
-                ))}
-              </div>
+              {/* Files — only when expanded */}
+              {isOpen && n.files && n.files.length > 0 && (
+                <div style={nlStyles.fileRow}>
+                  {n.files.map((f) => (
+                    <span key={f.name} style={nlStyles.fileChip}>
+                      <span className="material-icons-outlined" style={nlStyles.clipIcon}>attach_file</span>
+                      <span style={nlStyles.fileName}>{f.name}</span>
+                      <span style={nlStyles.fileSize}>{f.size}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         );

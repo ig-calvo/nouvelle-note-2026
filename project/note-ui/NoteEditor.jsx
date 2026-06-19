@@ -16,6 +16,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
 
   const [chips, setChips] = React.useState({});
   const [popover, setPopover] = React.useState(null);
+  const [inlineEdit, setInlineEdit] = React.useState(null); // { chipId, field, fieldRect }
   const [linkedChipId, setLinkedChipId] = React.useState(null);
 
   const [everOpened, setEverOpened] = React.useState(false);
@@ -56,6 +57,42 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
     window.addEventListener('ct-picker-open', onPickerOpen);
     return function() { window.removeEventListener('ct-picker-open', onPickerOpen); };
   }, []);
+
+  // Ref kept up-to-date every render so the event handler always uses fresh setters
+  const addDiagCallbackRef = React.useRef(null);
+  addDiagCallbackRef.current = function(name) {
+    if (name && name.trim()) {
+      var label = name.trim();
+      var id = 'diag-' + Date.now();
+      setSections(function(secs) { return secs.concat([{ id: id, type: 'diagnostic', title: label, content: '' }]); });
+      setTags(function(ts) { return ts.indexOf(label) === -1 ? ts.concat([label]) : ts; });
+      setShowTags(true);
+    } else {
+      setDiagInput('');
+      setAddingDiagnostic(true);
+    }
+  };
+
+  React.useEffect(function() {
+    function handler(e) {
+      var name = (e.detail && e.detail.name) || '';
+      if (addDiagCallbackRef.current) addDiagCallbackRef.current(name);
+    }
+    window.addEventListener('note:add-diagnostic', handler);
+    return function() { window.removeEventListener('note:add-diagnostic', handler); };
+  }, []);
+
+  // Dispatch chip counts whenever chips or sections change (drives footer counters)
+  React.useEffect(function() {
+    var counts = {};
+    Object.values(chips).forEach(function(c) {
+      var t = c.entity && c.entity.type;
+      if (t) counts[t] = (counts[t] || 0) + 1;
+    });
+    var dxCount = sections.filter(function(s) { return s.type === 'diagnostic'; }).length;
+    if (dxCount) counts.diagnostic = dxCount;
+    window.dispatchEvent(new CustomEvent('note:chips-change', { detail: counts }));
+  }, [chips, sections]);
 
   // ----- section content helpers -----
   function setSectionContent(sectionId, valOrFn) {
@@ -116,9 +153,60 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
     }
   }
 
-  function onChipClick(chipId, rect) {
+  function onChipClick(chipId, rect, extra) {
+    var chip = chips[chipId];
+    if (chip && chip.entity && chip.entity.type === 'file' && chip.entity.url) {
+      window.open(chip.entity.url, '_blank');
+      return;
+    }
+    // Edit button (···) → open full modal
+    if (extra && extra.action === 'modal') {
+      setInlineEdit(null);
+      setPopover({ chipId: chipId, anchorRect: rect });
+      setLinkedChipId(chipId);
+      return;
+    }
+    // Zone click on prescription chip → inline autocomplete editor
+    if (extra && extra.field && chip && chip.entity && chip.entity.type === 'prescription') {
+      setInlineEdit({ chipId: chipId, field: extra.field, fieldRect: extra.fieldRect || rect });
+      setLinkedChipId(chipId);
+      return;
+    }
+    // All other chips → full modal
     setPopover({ chipId: chipId, anchorRect: rect });
     setLinkedChipId(chipId);
+  }
+
+  function saveInlineEdit(chipId, field, val) {
+    setChips(function(cs) {
+      var c = cs[chipId]; if (!c) return cs;
+      var details = Object.assign({}, c.entity.details || {});
+      if (field === 'dose') {
+        var dm = /^([\d.]+)\s*(mg|g|mcg|µg|mL|unités?|UI)$/i.exec(val.trim());
+        if (dm) { details.dose = dm[1]; details.unit = dm[2]; }
+        else { details.dose = val.replace(/[^0-9.]/g, '') || details.dose; }
+      } else if (field === 'frequency') {
+        details.frequency = val;
+      } else if (field === 'form_route') {
+        var frMap = {
+          '1 co PO': { form: 'comprimé', route: 'PO' }, '2 co PO': { form: 'comprimé', route: 'PO' },
+          '½ co PO': { form: 'comprimé', route: 'PO' }, '1 gél PO': { form: 'gélule', route: 'PO' },
+          '2 inh Inh': { form: 'aérosol-doseur', route: 'Inhalé' }, '1 amp SC': { form: 'ampoule', route: 'SC' },
+          '5 mL PO': { form: 'sirop', route: 'PO' }, '10 mL PO': { form: 'sirop', route: 'PO' }
+        };
+        var frm = frMap[val];
+        if (frm) { details.form = frm.form; details.route = frm.route; }
+      } else if (field === 'duration_refills') {
+        var drm = /^(\d+)\s*(jours?|semaines?|mois)(?:\s+R(\d+))?$/i.exec(val.trim());
+        if (drm) { details.duration = drm[1]; details.durationUnit = drm[2]; if (drm[3] !== undefined) details.refills = drm[3]; }
+        else if (/^long terme/i.test(val)) { details.duration = ''; details.durationUnit = ''; var rm = val.match(/R(\d+)/i); if (rm) details.refills = rm[1]; }
+      }
+      var newEntity = Object.assign({}, c.entity, { details: details });
+      newEntity = Object.assign({}, newEntity, { label: deriveLabel(newEntity) });
+      if (newEntity.type === 'prescription' && newEntity.rx) newEntity.rx = window.NOTE_DATA.deriveRx(details, newEntity.rx);
+      return Object.assign({}, cs, { [chipId]: { entity: newEntity } });
+    });
+    setInlineEdit(null);
   }
 
   function savePopover(chipId, draft) {
@@ -343,6 +431,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
     setDiagInput('');
     setToolOpen(false);
     setToolBodyCollapsed(false);
+    setInlineEdit(null);
   }
 
   function handleComplete() {
@@ -609,37 +698,29 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
 
           <div style={neStyles.divider} />
 
-          {/* Ajouter une section / un diagnostic */}
+          {/* Ajouter une section / formulaire diagnostic (déclenché par /dx) */}
           <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
             <button style={neStyles.addSectionBtn} onClick={addSection}>
               <span className="material-icons-outlined" style={{ fontSize: 18 }}>add</span>
               Ajouter une section
             </button>
-            <span style={{ color: '#ddd' }}>|</span>
-            {addingDiagnostic
-              ? React.createElement('div', { style: neStyles.addDiagForm },
-                  React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 18, color: '#1a5fd4', flexShrink: 0 } }, 'local_hospital'),
-                  React.createElement('input', {
-                    autoFocus: true,
-                    placeholder: 'Nom du diagnostic…',
-                    value: diagInput,
-                    style: neStyles.diagInput,
-                    onChange: function(e) { setDiagInput(e.target.value); },
-                    onKeyDown: function(e) {
-                      if (e.key === 'Enter') addDiagnostic();
-                      if (e.key === 'Escape') { setAddingDiagnostic(false); setDiagInput(''); }
-                    }
-                  }),
-                  React.createElement('button', { style: neStyles.diagConfirmBtn, onClick: addDiagnostic }, 'Ajouter'),
-                  React.createElement('button', { style: neStyles.diagCancelBtn, onClick: function() { setAddingDiagnostic(false); setDiagInput(''); } }, 'Annuler')
-                )
-              : React.createElement('button', {
-                  style: neStyles.addSectionBtn,
-                  onClick: function() { setAddingDiagnostic(true); setDiagInput(''); }
-                },
-                  React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 18, color: '#1a5fd4' } }, 'local_hospital'),
-                  React.createElement('span', { style: { color: '#1a5fd4' } }, 'Ajouter un diagnostic')
-                )
+            {addingDiagnostic &&
+              React.createElement('div', { style: neStyles.addDiagForm },
+                React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 18, color: '#1a5fd4', flexShrink: 0 } }, 'local_hospital'),
+                React.createElement('input', {
+                  autoFocus: true,
+                  placeholder: 'Nom du diagnostic…',
+                  value: diagInput,
+                  style: neStyles.diagInput,
+                  onChange: function(e) { setDiagInput(e.target.value); },
+                  onKeyDown: function(e) {
+                    if (e.key === 'Enter') addDiagnostic();
+                    if (e.key === 'Escape') { setAddingDiagnostic(false); setDiagInput(''); }
+                  }
+                }),
+                React.createElement('button', { style: neStyles.diagConfirmBtn, onClick: addDiagnostic }, 'Ajouter'),
+                React.createElement('button', { style: neStyles.diagCancelBtn, onClick: function() { setAddingDiagnostic(false); setDiagInput(''); } }, 'Annuler')
+              )
             }
           </div>
 
@@ -663,6 +744,17 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
           onSave={savePopover}
           onRevert={revertChip}
           onDelete={deleteChip} />
+      }
+
+      {/* Inline field editor (click on chip zone) */}
+      {inlineEdit && chips[inlineEdit.chipId] &&
+        <ChipInlineEditor
+          chipId={inlineEdit.chipId}
+          field={inlineEdit.field}
+          fieldRect={inlineEdit.fieldRect}
+          chips={chips}
+          onSave={saveInlineEdit}
+          onClose={function() { setInlineEdit(null); }} />
       }
     </div>
   );
@@ -703,6 +795,143 @@ function SectionTitle({ value, onChange, labelStyle }) {
       className: 'material-icons-outlined',
       style: { fontSize: 13, marginLeft: 5, opacity: 0.35, verticalAlign: 'middle' }
     }, 'edit')
+  );
+}
+
+// ---------------------------------------------------------
+// ChipInlineEditor — autocomplete dropdown for a specific Rx chip field
+// ---------------------------------------------------------
+function ChipInlineEditor({ chipId, field, fieldRect, chips, onSave, onClose }) {
+  var chip = chips[chipId];
+  var details = (chip && chip.entity && chip.entity.details) || {};
+
+  var initialVal = '';
+  if (field === 'dose') initialVal = (details.dose || '') + (details.unit || '');
+  else if (field === 'frequency') initialVal = details.frequency || '';
+  else if (field === 'form_route') {
+    var qty0 = details.form === 'comprimé' ? '1 co' : details.form === 'aérosol-doseur' ? '2 inh' : details.form === 'gélule' ? '1 gél' : '';
+    initialVal = (qty0 + (details.route ? ' ' + details.route : '')).trim();
+  } else if (field === 'duration_refills') {
+    var dp0 = [];
+    if (details.duration) dp0.push(details.duration + ' ' + (details.durationUnit || 'jours'));
+    if (details.refills) dp0.push('R' + details.refills);
+    initialVal = dp0.join(' ');
+  }
+
+  var ALL_SUGGESTIONS = {
+    dose: [
+      '0.5mg', '1mg', '2mg', '2.5mg', '5mg', '7.5mg', '10mg', '12.5mg', '15mg', '20mg',
+      '25mg', '30mg', '37.5mg', '40mg', '50mg', '60mg', '75mg', '80mg', '100mg', '125mg',
+      '150mg', '160mg', '200mg', '250mg', '300mg', '400mg', '500mg', '600mg', '750mg', '800mg',
+      '1g', '1.5g', '2g', '3g', '4g',
+      '25mcg', '50mcg', '75mcg', '100mcg', '125mcg', '150mcg', '175mcg', '200mcg',
+      '1000UI', '2000UI', '5000UI', '10000UI',
+      '5mL', '10mL', '15mL', '20mL', '30mL'
+    ],
+    frequency: [
+      'DIE', 'BID', 'TID', 'QID', 'HS',
+      'q4h', 'q6h', 'q8h', 'q12h',
+      'q4-6h PRN', 'q6-8h PRN', 'q8-12h PRN',
+      'DIE PRN', 'BID PRN', 'TID PRN', 'Au besoin (PRN)',
+      '1× / semaine', '2× / semaine', '3× / semaine',
+      '1× / 2 semaines', '1× / mois'
+    ],
+    form_route: [
+      '1 co PO', '2 co PO', '½ co PO', '1½ co PO', '3 co PO', '4 co PO',
+      '1 gél PO', '2 gél PO',
+      '1 cap PO', '2 cap PO',
+      '1 co SL',
+      '1 timbre TD',
+      '2 inh Inh', '1 inh Inh', '4 inh Inh',
+      '1 vap nasale Nasal', '2 vap nasale Nasal',
+      '1 amp SC', '1 amp IM', '1 amp IV',
+      '5 mL PO', '10 mL PO', '15 mL PO', '20 mL PO',
+      '1 supp PR',
+      'Appliquer localement'
+    ],
+    duration_refills: [
+      '3 jours R0', '5 jours R0', '7 jours R0', '10 jours R0', '14 jours R0',
+      '21 jours R0', '28 jours R0',
+      '30 jours R0', '30 jours R1', '30 jours R2', '30 jours R3',
+      '30 jours R5', '30 jours R11',
+      '60 jours R0', '60 jours R5',
+      '90 jours R0', '90 jours R3', '90 jours R11',
+      '6 mois R1', '1 an R0',
+      'Long terme R0', 'Long terme R3', 'Long terme R11'
+    ]
+  };
+  var FIELD_LABELS = { dose: 'Dose', frequency: 'Fréquence', form_route: 'Forme / Voie', duration_refills: 'Durée / Renouvellements' };
+
+  var _q = React.useState(initialVal); var query = _q[0]; var setQuery = _q[1];
+  var _ai = React.useState(0); var activeIdx = _ai[0]; var setActiveIdx = _ai[1];
+  var inputRef = React.useRef(null);
+
+  var suggestions = (ALL_SUGGESTIONS[field] || []).filter(function(s) {
+    return !query || s.toLowerCase().includes(query.toLowerCase());
+  });
+
+  React.useEffect(function() { if (inputRef.current) inputRef.current.select(); }, []);
+
+  React.useEffect(function() {
+    function onDown(e) {
+      var el = document.getElementById('chip-inline-editor');
+      if (el && !el.contains(e.target)) onClose();
+    }
+    document.addEventListener('mousedown', onDown, true);
+    return function() { document.removeEventListener('mousedown', onDown, true); };
+  }, [onClose]);
+
+  function handleSelect(val) { onSave(chipId, field, val); }
+
+  var edLeft = Math.max(8, Math.min(fieldRect.left, window.innerWidth - 280));
+  var edTop = fieldRect.bottom + 6;
+
+  return React.createElement('div', {
+    id: 'chip-inline-editor',
+    style: {
+      position: 'fixed', top: edTop, left: edLeft, width: 260, zIndex: 85,
+      background: '#fff', border: '1px solid #c5cae9', borderRadius: 10,
+      boxShadow: '0 6px 24px rgba(37,36,94,0.18)', overflow: 'hidden',
+      fontFamily: "'Inter', sans-serif"
+    }
+  },
+    React.createElement('div', { style: { padding: '7px 12px 6px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', gap: 8 } },
+      React.createElement('span', { style: { fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: '#6967d1', textTransform: 'uppercase', flexShrink: 0 } }, FIELD_LABELS[field] || field),
+      React.createElement('input', {
+        ref: inputRef,
+        value: query,
+        onChange: function(e) { setQuery(e.target.value); setActiveIdx(0); },
+        onKeyDown: function(e) {
+          if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+          else if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(function(i) { return Math.min(suggestions.length - 1, i + 1); }); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(function(i) { return Math.max(0, i - 1); }); }
+          else if (e.key === 'Enter') { e.preventDefault(); if (suggestions[activeIdx]) handleSelect(suggestions[activeIdx]); else if (query.trim()) handleSelect(query.trim()); }
+        },
+        placeholder: 'Rechercher…',
+        style: { flex: 1, border: 'none', outline: 'none', font: "400 14px 'Inter', sans-serif", color: 'rgba(0,0,0,0.85)', background: 'transparent' }
+      })
+    ),
+    React.createElement('div', { style: { maxHeight: 224, overflowY: 'auto', padding: '4px 0' } },
+      suggestions.length === 0
+        ? React.createElement('div', { style: { padding: '10px 14px', fontSize: 13, color: 'rgba(0,0,0,0.38)' } }, 'Aucune suggestion')
+        : suggestions.map(function(s, i) {
+            var isActive = i === activeIdx;
+            return React.createElement('div', {
+              key: s,
+              onMouseEnter: function() { setActiveIdx(i); },
+              onMouseDown: function(e) { e.preventDefault(); handleSelect(s); },
+              style: {
+                padding: '9px 14px', cursor: 'pointer', fontSize: 14,
+                color: isActive ? '#fff' : 'rgba(0,0,0,0.82)',
+                background: isActive ? '#4b3fa6' : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+              }
+            },
+              s,
+              isActive ? React.createElement('span', { style: { fontSize: 11, opacity: 0.7 } }, '↵') : null
+            );
+          })
+    )
   );
 }
 

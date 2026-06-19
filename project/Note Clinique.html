@@ -154,8 +154,7 @@
 
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "doctorName": "Véronique Charland",
-  "rxChipSig": true
+  "doctorName": "Véronique Charland"
 } /*EDITMODE-END*/;
 
 function App() {
@@ -165,11 +164,14 @@ function App() {
   const [smartModal, setSmartModal] = React.useState(false);
   const [smartActive, setSmartActive] = React.useState(false);
   const [completedNotes, setCompletedNotes] = React.useState([]);
+  const [chipCounts, setChipCounts] = React.useState({});
   const noteCompleteRef = React.useRef(null);
 
   React.useEffect(() => {
-    document.body.classList.toggle('hide-rx-sig', !t.rxChipSig);
-  }, [t.rxChipSig]);
+    function handler(e) { setChipCounts(e.detail || {}); }
+    window.addEventListener('note:chips-change', handler);
+    return () => window.removeEventListener('note:chips-change', handler);
+  }, []);
 
   function handleNoteOpen() {
     if (noteOpen) return;
@@ -219,10 +221,41 @@ function App() {
             <NotesList doctorName={t.doctorName} extraNotes={completedNotes} />
             {noteOpen &&
             <div className="note-footer" style={{ gap: "8px", borderRadius: "16px 16px 16px 1px", padding: "16px" }}>
-              <div style={{ position: 'relative', marginLeft: 8 }}>
-                <button style={{ background: 'none', border: 0, cursor: 'pointer', fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 16, color: '#25245E', padding: '4px 2px', letterSpacing: -0.5 }}>Rᴘ</button>
-                <span style={{ position: 'absolute', top: -4, right: -10, width: 18, height: 18, background: '#1975d1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 700 }}>1</span>
-              </div>
+              {/* Prescription counter */}
+              {(chipCounts.prescription > 0) && (
+                <div title="Prescriptions" style={{ position: 'relative', marginLeft: 4, display: 'flex', alignItems: 'center' }}>
+                  <button style={{ background: 'none', border: 0, cursor: 'default', fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 16, color: '#25245E', padding: '4px 2px', letterSpacing: -0.5 }}>Rᴘ</button>
+                  <span style={{ position: 'absolute', top: -2, right: -10, minWidth: 18, height: 18, background: '#1975d1', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 700, padding: '0 3px' }}>{chipCounts.prescription}</span>
+                </div>
+              )}
+              {/* Lab counter */}
+              {(chipCounts.lab > 0) && (
+                <div title="Laboratoire" style={{ position: 'relative', display: 'flex', alignItems: 'center', marginLeft: 4 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#25245E' }}>science</span>
+                  <span style={{ position: 'absolute', top: -2, right: -10, minWidth: 18, height: 18, background: '#1975d1', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 700, padding: '0 3px' }}>{chipCounts.lab}</span>
+                </div>
+              )}
+              {/* Imaging counter */}
+              {(chipCounts.imaging > 0) && (
+                <div title="Imagerie" style={{ position: 'relative', display: 'flex', alignItems: 'center', marginLeft: 4 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#25245E' }}>radiology</span>
+                  <span style={{ position: 'absolute', top: -2, right: -10, minWidth: 18, height: 18, background: '#1975d1', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 700, padding: '0 3px' }}>{chipCounts.imaging}</span>
+                </div>
+              )}
+              {/* Diagnostic counter */}
+              {(chipCounts.diagnostic > 0) && (
+                <div title="Diagnostics" style={{ position: 'relative', display: 'flex', alignItems: 'center', marginLeft: 4 }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 22, color: '#25245E' }}>local_hospital</span>
+                  <span style={{ position: 'absolute', top: -2, right: -10, minWidth: 18, height: 18, background: '#1975d1', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 700, padding: '0 3px' }}>{chipCounts.diagnostic}</span>
+                </div>
+              )}
+              {/* File counter */}
+              {(chipCounts.file > 0) && (
+                <div title="Fichiers" style={{ position: 'relative', display: 'flex', alignItems: 'center', marginLeft: 4 }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 22, color: '#25245E' }}>attach_file</span>
+                  <span style={{ position: 'absolute', top: -2, right: -10, minWidth: 18, height: 18, background: '#1975d1', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 700, padding: '0 3px' }}>{chipCounts.file}</span>
+                </div>
+              )}
               <div style={{ flex: 1 }} />
               <button style={{ border: '1px solid #d0d0e0', borderRadius: 8, background: '#eeeef8', padding: '9px 22px', cursor: 'pointer', font: "500 14px 'Inter',sans-serif", color: '#25245E' }}>Sauvegarder</button>
               <button style={{ border: 0, borderRadius: 8, background: '#25245E', padding: '9px 24px', cursor: 'pointer', font: "600 14px 'Inter',sans-serif", color: '#fff' }}
@@ -243,8 +276,6 @@ function App() {
       <TweaksPanel title="Tweaks">
         <TweakSection label="Médecin" />
         <TweakText label="Nom du médecin" value={t.doctorName} onChange={(v) => setTweak("doctorName", v)} />
-        <TweakSection label="Prescriptions" />
-        <TweakToggle label="Posologie sur la puce Rx" value={t.rxChipSig} onChange={(v) => setTweak("rxChipSig", v)} />
       </TweaksPanel>
     </div>);
 

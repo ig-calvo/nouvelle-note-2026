@@ -28,12 +28,14 @@ function newChipId() {return 'c' + _chipSeq++;}
       node.setAttribute('contenteditable', 'false');
       node.classList.add('chip');
       if (data.rx) {
-        // Rich inline order chip: [icon] Name dose | [detail box]
+        // Rich inline order chip: [icon] Name dose | [split-sig parts] [edit btn]
         const kind = data.rx.kind || 'rx';
         node.classList.add('chip--rx');
         node.classList.add('chip--' + kind);
         node.setAttribute('data-rx', JSON.stringify(data.rx));
         node.setAttribute('data-label', data.label || '');
+        const d = data.details || {};
+        if (Object.keys(d).length > 0) node.setAttribute('data-details', JSON.stringify(d));
         const ic = document.createElement('span');
         if (kind === 'rx') {
           ic.className = 'chip-rx-icon';
@@ -49,12 +51,49 @@ function newChipId() {return 'c' + _chipSeq++;}
         node.appendChild(nm);
         const ds = document.createElement('span');
         ds.className = 'chip-rx-dose';
+        ds.setAttribute('data-field', 'dose');
         ds.textContent = data.rx.dose || '';
         node.appendChild(ds);
-        const sg = document.createElement('span');
-        sg.className = 'chip-rx-sig';
-        sg.textContent = data.rx.sig || '';
-        node.appendChild(sg);
+        // If structured details available, render split sig parts; otherwise fall back to sig string
+        if (d.frequency) {
+          const qty = d.form === 'comprimé' ? '1 co' : d.form === 'aérosol-doseur' ? '2 inh' : d.form === 'gélule' ? '1 gél' : '1 dose';
+          const fr = document.createElement('span');
+          fr.className = 'chip-rx-formroute';
+          fr.setAttribute('data-field', 'form_route');
+          fr.textContent = (qty + (d.route ? ' ' + d.route : '')).trim();
+          node.appendChild(fr);
+          const sep1 = document.createElement('span'); sep1.className = 'chip-rx-sep'; sep1.textContent = ' '; node.appendChild(sep1);
+          const freq = document.createElement('span');
+          freq.className = 'chip-rx-freq';
+          freq.setAttribute('data-field', 'frequency');
+          freq.textContent = d.frequency;
+          node.appendChild(freq);
+          const durParts = [];
+          if (d.duration && d.duration !== '—') durParts.push('× ' + d.duration + ' ' + (d.durationUnit || 'jours'));
+          if (d.refills !== undefined && String(d.refills) !== '' && String(d.refills) !== '0') durParts.push('R' + d.refills);
+          if (durParts.length) {
+            const sep2 = document.createElement('span'); sep2.className = 'chip-rx-sep'; sep2.textContent = ' '; node.appendChild(sep2);
+            const dur = document.createElement('span');
+            dur.className = 'chip-rx-dur';
+            dur.setAttribute('data-field', 'duration_refills');
+            dur.textContent = durParts.join(' ');
+            node.appendChild(dur);
+          }
+        } else {
+          const sg = document.createElement('span');
+          sg.className = 'chip-rx-sig';
+          sg.textContent = data.rx.sig || '';
+          node.appendChild(sg);
+        }
+        // Edit button — visible on chip hover, opens full modal
+        if (kind === 'rx') {
+          const eb = document.createElement('span');
+          eb.className = 'chip-rx-editbtn';
+          eb.setAttribute('data-action', 'modal');
+          eb.setAttribute('title', 'Modifier les détails complets');
+          eb.textContent = '···';
+          node.appendChild(eb);
+        }
         return node;
       }
       // icon
@@ -70,14 +109,15 @@ function newChipId() {return 'c' + _chipSeq++;}
     }
     static value(node) {
       if (node.classList.contains('chip--rx')) {
-        let rx = {};
+        let rx = {}, details = {};
         try { rx = JSON.parse(node.getAttribute('data-rx') || '{}'); } catch (e) {}
+        try { details = JSON.parse(node.getAttribute('data-details') || '{}'); } catch (e) {}
         return {
           cid: node.getAttribute('data-cid'),
           type: node.getAttribute('data-type'),
           label: node.getAttribute('data-label') || '',
           icon: rx.kind === 'lab' ? 'science' : rx.kind === 'img' ? 'radiology' : 'pill',
-          rx
+          rx, details
         };
       }
       return {
@@ -132,7 +172,7 @@ function newChipId() {return 'c' + _chipSeq++;}
         ic.textContent = '℞';
       } else {
         ic.className = 'material-symbols-outlined orderbadge-glyph';
-        ic.textContent = kind === 'lab' ? 'science' : 'radiology';
+        ic.textContent = kind === 'lab' ? 'science' : kind === 'dx' ? 'local_hospital' : 'radiology';
       }
       node.appendChild(ic);
       return node;
@@ -161,7 +201,8 @@ function storedToDelta(stored, chips) {
               type: chip.entity.type,
               label: chip.entity.label,
               icon: meta.icon || 'bookmark',
-              rx: chip.entity.rx || undefined
+              rx: chip.entity.rx || undefined,
+              details: chip.entity.details || undefined
             } } });
       }
     } else if (p) {
@@ -244,6 +285,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
   const [, setFavBump] = useStateE(0); // re-render when favorites toggle
   const [addBtnOffset, setAddBtnOffset] = useStateE(null); // null = CSS default (unfocused)
   const addBtnRef = useRefE(null);
+  const fileInputRef = useRefE(null);
   const slashFmtRef = useRefE(null); // {index, length} of the highlighted "/command" run
 
   // Paint / clear the rounded highlight behind the live "/command" text.
@@ -288,7 +330,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
   // Close the slash menu and remove its highlight (text still present).
   function closeSlashMenu() {
     clearSlashPaint();
-    if (slashStateRef.current && slashStateRef.current.mode === 'order') removeOrderBadge();
+    if (slashStateRef.current && (slashStateRef.current.mode === 'order' || slashStateRef.current.mode === 'diagnostic')) removeOrderBadge();
     setSlash(null);slashStateRef.current = null;
   }
 
@@ -333,12 +375,27 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       updateGhostAndSlash(q);
     });
 
-    // Chip click handler (delegated on the editor root)
+    // Chip click handler — detects which zone was clicked (data-field or data-action)
     q.root.addEventListener('mousedown', (e) => {
       const chipEl = e.target.closest('.chip[data-cid]');
       if (chipEl) {
         e.preventDefault();
-        onChipClick(chipEl.getAttribute('data-cid'), chipEl.getBoundingClientRect());
+        const cid = chipEl.getAttribute('data-cid');
+        const actionEl = e.target.closest('[data-action]');
+        const fieldEl = e.target.closest('[data-field]');
+        if (actionEl) {
+          onChipClickRef.current(cid, chipEl.getBoundingClientRect(), { action: actionEl.getAttribute('data-action') });
+        } else if (fieldEl) {
+          onChipClickRef.current(cid, chipEl.getBoundingClientRect(), { field: fieldEl.getAttribute('data-field'), fieldRect: fieldEl.getBoundingClientRect() });
+        } else {
+          // Click on name/icon of rx chip → open dose editor by default
+          const doseEl = chipEl.querySelector('[data-field="dose"]');
+          if (doseEl && chipEl.classList.contains('chip--rx')) {
+            onChipClickRef.current(cid, chipEl.getBoundingClientRect(), { field: 'dose', fieldRect: doseEl.getBoundingClientRect() });
+          } else {
+            onChipClickRef.current(cid, chipEl.getBoundingClientRect(), null);
+          }
+        }
       }
     });
 
@@ -349,27 +406,35 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       // Slash navigation first — we'll intercept when menu is open
       if (slashStateRef.current) {
         const s0 = slashStateRef.current;
-        const isOrder = s0.mode === 'order';
-        const listFor = (query) => isOrder
-          ? flattenRxResults(window.NOTE_DATA.searchOrder(s0.kind, query || ''))
-          : filterSlash(query);
-        if (e.key === 'Escape') {e.preventDefault();closeSlashMenu();return;}
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          setSlash((s) => {const items = listFor(s.query);const ns = { ...s, activeIndex: Math.min(items.length - 1, s.activeIndex + 1) };slashStateRef.current = ns;return ns;});
-          return;
-        }
-        if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          setSlash((s) => {const ns = { ...s, activeIndex: Math.max(0, s.activeIndex - 1) };slashStateRef.current = ns;return ns;});
-          return;
-        }
-        if (e.key === 'Enter' || (isOrder && e.key === 'Tab')) {
-          e.preventDefault();
-          const items = listFor(s0.query);
-          const it = items[s0.activeIndex];
-          if (it) { isOrder ? insertOrderChip(it) : chooseSlashItem(it); }
-          return;
+        if (s0.mode === 'diagnostic') {
+          if (e.key === 'Escape') { e.preventDefault(); closeSlashMenu(); return; }
+          if (e.key === 'Enter') { e.preventDefault(); confirmDiagnostic(); return; }
+          // All other keys (typing, backspace) pass through
+        } else {
+          const isOrder = s0.mode === 'order';
+          const listFor = (query) => isOrder
+            ? flattenRxResults(window.NOTE_DATA.searchOrder(s0.kind, query || ''))
+            : filterSlash(query);
+          if (e.key === 'Escape') {e.preventDefault();closeSlashMenu();return;}
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSlash((s) => {const items = listFor(s.query);const ns = { ...s, activeIndex: Math.min(items.length - 1, s.activeIndex + 1) };slashStateRef.current = ns;return ns;});
+            return;
+          }
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSlash((s) => {const ns = { ...s, activeIndex: Math.max(0, s.activeIndex - 1) };slashStateRef.current = ns;return ns;});
+            return;
+          }
+          if (e.key === 'Enter' || (isOrder && e.key === 'Tab')) {
+            e.preventDefault();
+            const items = listFor(s0.query);
+            const it = items[s0.activeIndex];
+            if (it) { isOrder ? insertOrderChip(it) : chooseSlashItem(it); }
+            // Ensure Quill stays focused so user can type immediately after entering order/diagnostic mode
+            setTimeout(function() { quillRef.current && quillRef.current.focus(); }, 0);
+            return;
+          }
         }
       }
       // Med dropdown keyboard handling (Tab / Enter / Arrow / Esc)
@@ -409,6 +474,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
   // Live refs so keydown handler (bound once) sees current state
   const ghostRef = useRefE(null);ghostRef.current = ghost;
   const slashStateRef = useRefE(null);slashStateRef.current = slash;
+  const onChipClickRef = useRefE(null);onChipClickRef.current = onChipClick;
 
   // --- push external value updates into Quill (e.g. scenario change, toast revert)
   useEffectE(() => {
@@ -422,23 +488,42 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     if (sel) {try {q.setSelection(sel.index, 0, 'silent');} catch {}}
   }, [value]);
 
-  // --- reflect chips-map changes (label edits, linked highlight) without full reset
+  // --- reflect chips-map changes (label edits, inline field edits, linked highlight) without full reset
   useEffectE(() => {
     const q = quillRef.current;if (!q) return;
-    // Update chip labels/icons in-place
     q.root.querySelectorAll('.chip[data-cid]').forEach((node) => {
       const cid = node.getAttribute('data-cid');
       const chip = chips[cid];
       if (chip) {
         if (node.classList.contains('chip--rx')) {
           const rx = chip.entity.rx || {};
+          const d = chip.entity.details || {};
           const nm = node.querySelector('.chip-rx-name');
           if (nm && nm.textContent !== (rx.name || '')) nm.textContent = rx.name || '';
           const ds = node.querySelector('.chip-rx-dose');
           if (ds && ds.textContent !== (rx.dose || '')) ds.textContent = rx.dose || '';
+          // Update split sig spans
+          const fr = node.querySelector('.chip-rx-formroute');
+          if (fr && d.form) {
+            const qty = d.form === 'comprimé' ? '1 co' : d.form === 'aérosol-doseur' ? '2 inh' : d.form === 'gélule' ? '1 gél' : '1 dose';
+            const nfr = (qty + (d.route ? ' ' + d.route : '')).trim();
+            if (fr.textContent !== nfr) fr.textContent = nfr;
+          }
+          const freqEl = node.querySelector('.chip-rx-freq');
+          if (freqEl && d.frequency && freqEl.textContent !== d.frequency) freqEl.textContent = d.frequency;
+          const durEl = node.querySelector('.chip-rx-dur');
+          if (durEl) {
+            const dp = [];
+            if (d.duration && d.duration !== '—') dp.push('× ' + d.duration + ' ' + (d.durationUnit || 'jours'));
+            if (d.refills !== undefined && String(d.refills) !== '' && String(d.refills) !== '0') dp.push('R' + d.refills);
+            const ndt = dp.join(' ');
+            if (durEl.textContent !== ndt) durEl.textContent = ndt;
+          }
+          // Update fallback sig
           const sg = node.querySelector('.chip-rx-sig');
           if (sg && sg.textContent !== (rx.sig || '')) sg.textContent = rx.sig || '';
           node.setAttribute('data-rx', JSON.stringify(rx));
+          if (Object.keys(d).length) node.setAttribute('data-details', JSON.stringify(d));
           node.setAttribute('data-label', chip.entity.label || '');
           node.classList.toggle('open', linkedChipId === cid);
           return;
@@ -489,6 +574,23 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
           paintSlash(bIdx + 1, query.length);
         }
       }
+    } else if (slashStateRef.current && slashStateRef.current.mode === 'diagnostic') {
+      // Diagnostic mode: like order mode — badge + free-text name.
+      const s = slashStateRef.current;
+      const bIdx = orderBadgeIndex();
+      if (bIdx < 0 || caret <= bIdx) {
+        closeSlashMenu();
+      } else {
+        const query = caret > bIdx + 1 ? q.getText(bIdx + 1, caret - (bIdx + 1)) : '';
+        if (/\n/.test(query)) {
+          closeSlashMenu();
+        } else {
+          const pos = getBoundsPos(q, caret);
+          const ns = { ...s, query, startIndex: bIdx, pos };
+          setSlash(ns);slashStateRef.current = ns;
+          paintSlash(bIdx + 1, query.length);
+        }
+      }
     } else if (slashStateRef.current) {
       const s = slashStateRef.current;
       // Literal text from the slash up to the caret.
@@ -498,10 +600,14 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       // "/rx ", "/lab ", "/img " (kind followed by a space) promotes to order
       // mode: the literal text collapses into an icon badge.
       const orderSpace = /^(rx|lab|img)\s/i.exec(query);
+      const dxSpace = /^dx\s/i.exec(query);
       if (caret <= s.startIndex || !slashIntact || /\n/.test(query)) {
         closeSlashMenu();
       } else if (orderSpace) {
         enterOrderMode(orderSpace[1].toLowerCase(), query.slice(orderSpace[0].length));
+        return;
+      } else if (dxSpace) {
+        enterDiagnosticMode(query.slice(dxSpace[0].length));
         return;
       } else if (/\s/.test(query)) {
         // Plain command with whitespace → user moved on to prose.
@@ -615,6 +721,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
   function chooseSlashItem(it) {
     const q = quillRef.current;if (!q) return;
     if (it.rxSearch || it.orderSearch) { enterOrderMode(it.kbd || 'rx'); return; }
+    if (it.diagnosticEntry) { enterDiagnosticMode(''); return; }
     const s = slashStateRef.current;
     const chipId = newChipId();
     silentRef.current = true;
@@ -691,6 +798,57 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     setFuncMenu(null);
   }
 
+  function enterDiagnosticMode(carryQuery) {
+    const q = quillRef.current; if (!q) return;
+    carryQuery = (carryQuery || '').replace(/\n/g, '');
+    const s = slashStateRef.current;
+    clearSlashPaint();
+    silentRef.current = true;
+    let at;
+    if (s) {
+      const sel = q.getSelection();
+      const end = sel ? sel.index : s.startIndex + (s.query || '').length + 1;
+      q.deleteText(s.startIndex, Math.max(0, end - s.startIndex), 'silent');
+      at = s.startIndex;
+    } else {
+      const sel = q.getSelection(true);
+      at = sel ? sel.index : Math.max(0, q.getLength() - 1);
+    }
+    q.insertEmbed(at, 'orderbadge', { kind: 'dx' }, 'silent');
+    if (carryQuery) q.insertText(at + 1, carryQuery, 'silent');
+    q.setSelection(at + 1 + carryQuery.length, 0, 'silent');
+    silentRef.current = false;
+    const stored = deltaToStored(q.getContents());
+    lastStoredRef.current = stored;
+    onChange(stored);
+    const pos = getBoundsPos(q, at + 1 + carryQuery.length);
+    const ns = { mode: 'diagnostic', kind: 'dx', query: carryQuery, activeIndex: 0, pos, startIndex: at };
+    setSlash(ns); slashStateRef.current = ns;
+    if (carryQuery) paintSlash(at + 1, carryQuery.length);
+    setGhost(null);
+    setFuncMenu(null);
+  }
+
+  function confirmDiagnostic() {
+    const q = quillRef.current;
+    const s = slashStateRef.current;
+    if (!q || !s || s.mode !== 'diagnostic') return;
+    const name = (s.query || '').trim();
+    const bIdx = orderBadgeIndex();
+    const at = bIdx >= 0 ? bIdx : s.startIndex;
+    const removeLen = (bIdx >= 0 ? 1 : 0) + (s.query || '').length;
+    clearSlashPaint();
+    silentRef.current = true;
+    if (removeLen > 0) q.deleteText(at, removeLen, 'silent');
+    silentRef.current = false;
+    const stored = deltaToStored(q.getContents());
+    lastStoredRef.current = stored;
+    onChange(stored);
+    setSlash(null); slashStateRef.current = null;
+    setGhost(null);
+    window.dispatchEvent(new CustomEvent('note:add-diagnostic', { detail: { name: name } }));
+  }
+
   function insertOrderChip(item) {
     const q = quillRef.current;
     const s = slashStateRef.current;
@@ -706,7 +864,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     clearSlashPaint();
     silentRef.current = true;
     if (removeLen > 0) q.deleteText(at, removeLen, 'silent');
-    q.insertEmbed(at, 'chip', { cid: chipId, type: def.type, label, icon: def.icon, rx }, 'silent');
+    q.insertEmbed(at, 'chip', { cid: chipId, type: def.type, label, icon: def.icon, rx, details: item.details || {} }, 'silent');
     q.insertText(at + 1, ' ', 'silent');
     q.setSelection(at + 2, 0, 'silent');
     silentRef.current = false;
@@ -728,6 +886,27 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     setGhost(null);
   }
 
+  function handleFileChange(e) {
+    const q = quillRef.current;
+    if (!q) return;
+    const files = Array.from(e.target.files || []);
+    files.forEach(function(file) {
+      const url = URL.createObjectURL(file);
+      const chipId = newChipId();
+      const sel = q.getSelection(true);
+      const at = sel ? sel.index : Math.max(0, q.getLength() - 1);
+      silentRef.current = true;
+      q.insertEmbed(at, 'chip', { cid: chipId, type: 'file', label: file.name, icon: 'attach_file' }, 'silent');
+      q.insertText(at + 1, ' ', 'silent');
+      q.setSelection(at + 2, 0, 'silent');
+      silentRef.current = false;
+      const stored = deltaToStored(q.getContents());
+      lastStoredRef.current = stored;
+      onAddChip(id, { chipId, entity: { type: 'file', label: file.name, url, text: file.name }, _prebuilt: true, storedOverride: stored });
+    });
+    e.target.value = '';
+  }
+
   // Detect order command from slash query: '/rx …', '/lab …', '/img …'
   function orderKindForQuery(query) {
     const m = /^(rx|lab|img)(\s|$)/i.exec(query || '');
@@ -735,11 +914,12 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
   }
 
   const isOrderMode = !!(slash && slash.mode === 'order');
+  const isDiagnosticMode = !!(slash && slash.mode === 'diagnostic');
   const orderKind = isOrderMode ? slash.kind : null;
   const orderDef = orderKind ? window.NOTE_DATA.ORDER_DEFS[orderKind] : null;
   const orderQuery = isOrderMode ? (slash.query || '') : '';
   const orderResults = isOrderMode ? window.NOTE_DATA.searchOrder(orderKind, orderQuery) : null;
-  const slashItems = slash && !isOrderMode ? filterSlash(slash.query) : [];
+  const slashItems = slash && !isOrderMode && !isDiagnosticMode ? filterSlash(slash.query) : [];
 
   // Open the functions menu (Prescription, Labo, Imagerie…) from the + button
   function openFunctionsMenu() {
@@ -833,7 +1013,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
           </div>);
 
       })()}
-      {slash && !isOrderMode &&
+      {slash && !isOrderMode && !isDiagnosticMode &&
       <SlashMenu
         position={{ top: slash.pos.caretBottom + 6, left: Math.max(8, Math.min(slash.pos.caretLeft, window.innerWidth - 332)) }}
         query={slash.query}
@@ -843,7 +1023,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         onClose={() => closeSlashMenu()} />
 
       }
-      {slash && !isOrderMode && (slash.query || '') === '' &&
+      {slash && !isOrderMode && !isDiagnosticMode && (slash.query || '') === '' &&
       <div className="slash-hint" style={{
         position: 'fixed',
         left: slash.pos.caretLeft + 5,
@@ -852,6 +1032,13 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         zIndex: 48
       }}>Saisissez du texte pour chercher une commande</div>
 
+      }
+      {isDiagnosticMode &&
+      <DiagnosticDropdown
+        position={{ top: slash.pos.caretBottom + 6, left: Math.max(8, Math.min(slash.pos.caretLeft, window.innerWidth - 320)) }}
+        query={slash.query || ''}
+        onConfirm={confirmDiagnostic}
+        onClose={closeSlashMenu} />
       }
       {slash && isOrderMode &&
       <RxMenu
@@ -874,11 +1061,50 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         orders={window.NOTE_DATA.SLASH_ITEMS.filter((t2) => t2.rxSearch || t2.orderSearch)}
         onPickTool={chooseSlashItem}
         onPickOrder={(kbd) => enterOrderMode(kbd)}
+        onPickFile={() => { fileInputRef.current && fileInputRef.current.click(); }}
         onClose={() => setFuncMenu(null)} />
 
       }
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.png"
+        multiple
+        style={{ display: 'none' }}
+        onChange={handleFileChange} />
     </>);
 
+}
+
+// ---------------------------------------------------------
+// DiagnosticDropdown — shown while the user types a name after /dx
+// ---------------------------------------------------------
+function DiagnosticDropdown({ position, query, onConfirm, onClose }) {
+  return (
+    <div style={{
+      position: 'fixed', top: position.top, left: position.left,
+      background: '#fff', border: '1px solid #b3ccf0', borderRadius: 10,
+      boxShadow: '0 4px 16px rgba(37,36,94,0.16)',
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '10px 16px', zIndex: 60, minWidth: 280
+    }}>
+      <span className="material-icons-outlined" style={{ fontSize: 18, color: '#1a5fd4', flexShrink: 0 }}>local_hospital</span>
+      {query
+        ? <span style={{ font: "400 14px 'Inter',sans-serif", color: 'rgba(0,0,0,0.75)' }}>
+            Diagnostic : <strong>{query}</strong>
+          </span>
+        : <span style={{ font: "400 14px 'Inter',sans-serif", color: 'rgba(0,0,0,0.45)' }}>
+            Saisissez le nom du diagnostic…
+          </span>
+      }
+      {query && (
+        <kbd style={{
+          marginLeft: 'auto', background: '#f0f0f8', border: '1px solid #d0d0e0',
+          borderRadius: 4, padding: '2px 7px', font: "500 12px 'Inter',sans-serif", color: '#555', flexShrink: 0
+        }}>↵</kbd>
+      )}
+    </div>
+  );
 }
 
 Object.assign(window, { EditorField, newChipId });

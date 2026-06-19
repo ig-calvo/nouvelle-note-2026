@@ -7,6 +7,8 @@ const ENTITY_TYPES = {
   imaging:      { key: 'imaging',      label: 'Imagerie',     icon: 'radiology', summaryGroup: 'Résultats' },
   problem:      { key: 'problem',      label: 'Problème', icon: 'flag', summaryGroup: 'Problèmes' },
   instructions: { key: 'instructions', label: 'Consignes',    icon: 'menu_book', summaryGroup: 'Consignes' },
+  diagnostic:   { key: 'diagnostic',   label: 'Diagnostic',   icon: 'local_hospital', summaryGroup: 'Diagnostics' },
+  file:         { key: 'file',         label: 'Fichier',       icon: 'attach_file',    summaryGroup: 'Fichiers' },
 };
 
 // MED_CATALOG — dictionary used for the autocomplete dropdown.
@@ -315,6 +317,8 @@ const RECOGNIZERS = [
 ];
 
 const SLASH_ITEMS = [
+  { key: 'diagnostic', section: 'Structure', icon: 'local_hospital', title: 'Diagnostic', desc: 'Créer une section diagnostic', kbd: 'dx',
+    diagnosticEntry: true },
   { key: 'prescription', section: 'Ajouter', icon: 'prescriptions', title: 'Prescriptions', desc: 'Rechercher et prescrire un médicament', kbd: 'rx',
     rxSearch: true },
   { key: 'lab', section: 'Ajouter', icon: 'science', title: 'Laboratoire', desc: 'FSC, TSH, bilan…', kbd: 'lab',

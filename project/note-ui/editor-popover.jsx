@@ -159,20 +159,39 @@ function SlashMenu({ position, query, onSelect, onClose, activeIndex, items }) {
 }
 
 // Functions / "Ajouter" menu — opened from the + button
-function AddMenu({ position, orders, onPickOrder, onClose }) {
+function AddMenu({ position, orders, onPickOrder, onPickFile, onClose }) {
   const stop = (e) => e.stopPropagation();
+  const [showFileSub, setShowFileSub] = useStateP(false);
 
   return (
     <>
       <div className="addmenu-scrim" onMouseDown={(e) => { e.preventDefault(); onClose(); }} />
       <div className="addmenu" style={position} onMouseDown={stop}>
         <div className="addmenu-sec">Rédaction</div>
-        <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); }}>
+        <button className="addmenu-item" style={showFileSub ? { background: '#f5f5fa' } : {}}
+          onMouseDown={(e) => { e.preventDefault(); setShowFileSub(s => !s); }}>
           <span className="material-icons-outlined ic">upload_file</span>
           <span className="lbl">Ajouter des fichiers</span>
           <span className="kbd">Alt+A</span>
-          <span className="material-icons-outlined arr">chevron_right</span>
+          <span className="material-icons-outlined arr" style={{ transition: 'transform 0.15s', transform: showFileSub ? 'rotate(90deg)' : 'none' }}>chevron_right</span>
         </button>
+        {showFileSub && (
+          <div style={{ background: '#f8f8fb', borderLeft: '3px solid #dde0f5', margin: '0 0 4px 18px', borderRadius: '0 6px 6px 0' }}>
+            <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); if (onPickFile) onPickFile('computer'); onClose(); }}>
+              <span className="material-icons-outlined ic" style={{ fontSize: 18 }}>laptop</span>
+              <span className="lbl">Depuis mon ordinateur</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(0,0,0,0.35)', fontFamily: "'Inter',sans-serif" }}>PDF · PNG</span>
+            </button>
+            <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); onClose(); }}>
+              <span className="material-icons-outlined ic" style={{ fontSize: 18 }}>smartphone</span>
+              <span className="lbl">Depuis mon téléphone</span>
+            </button>
+            <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); onClose(); }}>
+              <span className="material-icons-outlined ic" style={{ fontSize: 18 }}>person</span>
+              <span className="lbl">Depuis le téléphone du patient</span>
+            </button>
+          </div>
+        )}
         <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); }}>
           <span className="material-icons-outlined ic">bolt</span>
           <span className="lbl">Textes rapides</span>
