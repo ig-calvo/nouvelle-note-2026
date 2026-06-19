@@ -110,22 +110,35 @@
 .chip--lab .chip-rx-glyph { color: #1975d1; }
 .chip--img .chip-rx-glyph { color: #7a3ec2; }
 .chip--rx .chip-rx-name { font-weight: 700; font-size: 14px; color: var(--fg-1); padding: 0 1px 0 2px; }
-.chip--rx .chip-rx-dose { font-weight: 500; font-size: 13px; color: var(--fg-3); padding: 2px 4px; border-radius: 4px; cursor: pointer; transition: background 0.1s; }
-.chip--rx .chip-rx-dose:hover { background: #e8e7f6; color: #4b3fa6; }
 .chip--rx .chip-rx-dose:empty { display: none; }
-.chip--rx .chip-rx-sig { font-weight: 600; font-size: 12px; color: var(--fg-2); background: #f0f0f7; border: 1px solid #e0e0ec; border-radius: 5px; padding: 2px 7px; margin-left: 2px; letter-spacing: 0.1px; }
+.chip--rx .chip-rx-sig { display: inline-block; vertical-align: baseline; font-weight: 600; font-size: 12px; color: var(--fg-2); background: #f0f0f7; border: 1px solid #e0e0ec; border-radius: 4px; padding: 1px 5px; margin-left: 3px; letter-spacing: 0.1px; }
 .chip--rx .chip-rx-sig:empty { display: none; }
-/* Split sig sub-parts (shown when chip has structured details) */
-.chip--rx .chip-rx-sep { font-size: 12px; }
+/* Tokens de posologie cliquables — style unifié */
+.chip--rx .chip-rx-sep { display: none; }
+.chip--rx .chip-rx-dose,
 .chip--rx .chip-rx-form,
 .chip--rx .chip-rx-route,
 .chip--rx .chip-rx-freq,
-.chip--rx .chip-rx-dur { font-weight: 600; font-size: 12px; color: var(--fg-2); background: #f0f0f7; border: 1px solid #e0e0ec; border-radius: 4px; padding: 2px 6px; cursor: pointer; transition: background 0.1s, border-color 0.1s; margin-left: 2px; }
-.chip--rx .chip-rx-form { margin-left: 0; }
+.chip--rx .chip-rx-dur {
+  display: inline-block;
+  vertical-align: baseline;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--fg-2);
+  background: #f0f0f7;
+  border: 1px solid #e0e0ec;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 3px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  user-select: none;
+}
+.chip--rx .chip-rx-dose:hover,
 .chip--rx .chip-rx-form:hover,
 .chip--rx .chip-rx-route:hover,
 .chip--rx .chip-rx-freq:hover,
-.chip--rx .chip-rx-dur:hover { background: #e4e2f7; border-color: #b9b5e0; }
+.chip--rx .chip-rx-dur:hover { background: #e4e2f7; border-color: #b9b5e0; color: #4840a8; }
 /* ℞ icon and lab/img/ref glyph open full modal on click */
 .chip--rx .chip-rx-icon { cursor: pointer; }
 .chip--rx .chip-rx-icon:hover { opacity: 0.75; }
