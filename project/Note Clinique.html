@@ -164,6 +164,8 @@ function App() {
   const [bannerCollapsed, setBannerCollapsed] = React.useState(false);
   const [smartModal, setSmartModal] = React.useState(false);
   const [smartActive, setSmartActive] = React.useState(false);
+  const [completedNotes, setCompletedNotes] = React.useState([]);
+  const noteCompleteRef = React.useRef(null);
 
   React.useEffect(() => {
     document.body.classList.toggle('hide-rx-sig', !t.rxChipSig);
@@ -178,6 +180,28 @@ function App() {
     if (key === 'intelligente') { setSmartModal(true); return; }
     handleNoteOpen();
   }
+  function handleNoteComplete(data) {
+    const months = ['JANVIER','FÉVRIER','MARS','AVRIL','MAI','JUIN','JUILLET','AOÛT','SEPTEMBRE','OCTOBRE','NOVEMBRE','DÉCEMBRE'];
+    const d = new Date(data.date + 'T' + (data.time || '00:00'));
+    const dateLabel = d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + ' ' + (data.time || '');
+    const newNote = {
+      date: dateLabel.trim(),
+      author: t.doctorName,
+      clinic: 'Clinique du Centre-ville',
+      role: 'Médecin de famille',
+      mode: data.visitType === 'Appel téléphonique' ? 'APPEL' : 'PRÉSENTIEL',
+      title: data.raison || 'Note clinique',
+      icons: [],
+      diagnostics: data.diagnostics || [],
+      details: '',
+      conclusion: '',
+      files: [],
+    };
+    setCompletedNotes(prev => [newNote, ...prev]);
+    setNoteOpen(false);
+    setSmartActive(false);
+    setBannerCollapsed(false);
+  }
   return (
     <div className="app">
       <TopBar user={t.doctorName} />
@@ -186,18 +210,24 @@ function App() {
         <div className="content">
           <div className="center-col" style={{ padding: "0px 8px 0px 0px" }}>
             <PatientBanner forceCollapsed={bannerCollapsed} />
-            <NoteEditor isOpen={noteOpen} onOpen={handleNoteOpen} smartActive={smartActive} />
-            <NotesList doctorName={t.doctorName} />
+            <NoteEditor
+              isOpen={noteOpen}
+              onOpen={handleNoteOpen}
+              onComplete={handleNoteComplete}
+              completeRef={noteCompleteRef}
+              smartActive={smartActive} />
+            <NotesList doctorName={t.doctorName} extraNotes={completedNotes} />
             {noteOpen &&
-            <div className="note-footer" data-comment-anchor="c96d8d41d9-div-27-15" style={{ gap: "8px", borderRadius: "16px 16px 16px 1px", padding: "16px", height: "6px" }}>
-<div style={{ position: 'relative', marginLeft: 8 }}>
-                  <button style={{ background: 'none', border: 0, cursor: 'pointer', fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 16, color: '#25245E', padding: '4px 2px', letterSpacing: -0.5 }}>Rᴘ</button>
-                  <span style={{ position: 'absolute', top: -4, right: -10, width: 18, height: 18, background: '#1975d1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 700 }}>1</span>
-                </div>
-                <div style={{ flex: 1 }} />
-                <button style={{ border: '1px solid #d0d0e0', borderRadius: 8, background: '#eeeef8', padding: '9px 22px', cursor: 'pointer', font: "500 14px 'Inter',sans-serif", color: '#25245E' }}>Sauvegarder</button>
-                <button style={{ border: 0, borderRadius: 8, background: '#25245E', padding: '9px 24px', cursor: 'pointer', font: "600 14px 'Inter',sans-serif", color: '#fff' }}>Compléter</button>
+            <div className="note-footer" style={{ gap: "8px", borderRadius: "16px 16px 16px 1px", padding: "16px" }}>
+              <div style={{ position: 'relative', marginLeft: 8 }}>
+                <button style={{ background: 'none', border: 0, cursor: 'pointer', fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 16, color: '#25245E', padding: '4px 2px', letterSpacing: -0.5 }}>Rᴘ</button>
+                <span style={{ position: 'absolute', top: -4, right: -10, width: 18, height: 18, background: '#1975d1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 700 }}>1</span>
               </div>
+              <div style={{ flex: 1 }} />
+              <button style={{ border: '1px solid #d0d0e0', borderRadius: 8, background: '#eeeef8', padding: '9px 22px', cursor: 'pointer', font: "500 14px 'Inter',sans-serif", color: '#25245E' }}>Sauvegarder</button>
+              <button style={{ border: 0, borderRadius: 8, background: '#25245E', padding: '9px 24px', cursor: 'pointer', font: "600 14px 'Inter',sans-serif", color: '#fff' }}
+                onClick={() => { if (noteCompleteRef.current) noteCompleteRef.current(); }}>Compléter</button>
+            </div>
             }
           </div>
           <Summary />

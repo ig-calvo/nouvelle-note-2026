@@ -1,5 +1,5 @@
 /* global React */
-function NoteEditor({ isOpen, onOpen, smartActive }) {
+function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
   const DEFAULT_SECTIONS = [
     { id: 'sec-details',    title: 'Détails de la consultation', content: '' },
     { id: 'sec-conclusion', title: 'Conclusion',                 content: '' },
@@ -29,6 +29,10 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
   const [tags, setTags] = React.useState([]);
 
   const [toolBodyCollapsed, setToolBodyCollapsed] = React.useState(false);
+
+  const [raison, setRaison] = React.useState('');
+  const [addingDiagnostic, setAddingDiagnostic] = React.useState(false);
+  const [diagInput, setDiagInput] = React.useState('');
 
   // --- drag-to-place tool state
   // toolLoc: 'default' | sectionId
@@ -313,6 +317,52 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
     setSections(function(secs) { return secs.concat([{ id: id, title: 'Nouvelle section', content: '' }]); });
   }
 
+  function addDiagnostic() {
+    var label = diagInput.trim();
+    if (!label) { setAddingDiagnostic(false); return; }
+    var id = 'diag-' + Date.now();
+    setSections(function(secs) {
+      return secs.concat([{ id: id, type: 'diagnostic', title: label, content: '' }]);
+    });
+    setTags(function(ts) { return ts.indexOf(label) === -1 ? ts.concat([label]) : ts; });
+    setShowTags(true);
+    setAddingDiagnostic(false);
+    setDiagInput('');
+  }
+
+  function resetNote() {
+    setSections(DEFAULT_SECTIONS.map(function(s) { return Object.assign({}, s); }));
+    setRaison('');
+    setTags([]);
+    setSectionSplits({});
+    setChips({});
+    setToolLoc('default');
+    setToolZoneIndex(1);
+    setShowTags(false);
+    setAddingDiagnostic(false);
+    setDiagInput('');
+    setToolOpen(false);
+    setToolBodyCollapsed(false);
+  }
+
+  function handleComplete() {
+    var diagSections = sections.filter(function(s) { return s.type === 'diagnostic'; });
+    var data = {
+      raison: raison,
+      date: noteDate,
+      time: noteTime,
+      visitType: visitType,
+      tags: tags,
+      diagnostics: diagSections.map(function(s) { return s.title; }),
+    };
+    resetNote();
+    if (onComplete) onComplete(data);
+  }
+
+  React.useEffect(function() {
+    if (completeRef) completeRef.current = handleComplete;
+  });
+
   // ----- build interleaved items list -----
   // sectionItems: array of { type:'section', sec, idx } | { type:'toolzone' }
   var sectionItems = [];
@@ -348,7 +398,7 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
 
       {/* Fields */}
       <div style={neStyles.fieldsRow}>
-        <FloatField label="Raison de consultation" flex input onValueChange={function(v) { if (v.length > 0 && onOpen) onOpen(); }} />
+        <FloatField label="Raison de consultation" flex input value={raison} onValueChange={function(v) { setRaison(v); if (onOpen) onOpen(); }} onFocus={function() { if (onOpen) onOpen(); }} />
         <FloatField label="Date" width={210} input type="date" value={noteDate} onValueChange={setNoteDate} />
         <FloatField label="Heure" width={170} input type="time" value={noteTime} onValueChange={setNoteTime} />
         <FloatField label="Type de visite" width={260} select value={visitType} onValueChange={setVisitType} options={['Visite en clinique', 'Appel téléphonique', 'Mise à jour']} />
@@ -458,16 +508,31 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
 
                 /* En-tête de section */
                 React.createElement('div', { style: neStyles.secHead },
-                  React.createElement(SectionTitle, {
-                    value: sec.title,
-                    onChange: function(newTitle) {
-                      setSections(function(secs) {
-                        return secs.map(function(s) {
-                          return s.id === sec.id ? Object.assign({}, s, { title: newTitle }) : s;
-                        });
-                      });
-                    }
-                  }),
+                  sec.type === 'diagnostic'
+                    ? React.createElement('div', { style: neStyles.diagTitleRow },
+                        React.createElement('span', { className: 'material-icons-outlined', style: neStyles.diagIcon }, 'local_hospital'),
+                        React.createElement(SectionTitle, {
+                          value: sec.title,
+                          labelStyle: neStyles.diagLabel,
+                          onChange: function(newTitle) {
+                            setSections(function(secs) {
+                              return secs.map(function(s) {
+                                return s.id === sec.id ? Object.assign({}, s, { title: newTitle }) : s;
+                              });
+                            });
+                          }
+                        })
+                      )
+                    : React.createElement(SectionTitle, {
+                        value: sec.title,
+                        onChange: function(newTitle) {
+                          setSections(function(secs) {
+                            return secs.map(function(s) {
+                              return s.id === sec.id ? Object.assign({}, s, { title: newTitle }) : s;
+                            });
+                          });
+                        }
+                      }),
                   React.createElement('div', { style: { display: 'flex', gap: 2, alignItems: 'center' } },
                     /* Boutons de réordonnancement */
                     sections.length > 1 && idx > 0
@@ -544,11 +609,39 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
 
           <div style={neStyles.divider} />
 
-          {/* Ajouter une section */}
-          <button style={neStyles.addSectionBtn} onClick={addSection}>
-            <span className="material-icons-outlined" style={{ fontSize: 18 }}>add</span>
-            Ajouter une section
-          </button>
+          {/* Ajouter une section / un diagnostic */}
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button style={neStyles.addSectionBtn} onClick={addSection}>
+              <span className="material-icons-outlined" style={{ fontSize: 18 }}>add</span>
+              Ajouter une section
+            </button>
+            <span style={{ color: '#ddd' }}>|</span>
+            {addingDiagnostic
+              ? React.createElement('div', { style: neStyles.addDiagForm },
+                  React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 18, color: '#1a5fd4', flexShrink: 0 } }, 'local_hospital'),
+                  React.createElement('input', {
+                    autoFocus: true,
+                    placeholder: 'Nom du diagnostic…',
+                    value: diagInput,
+                    style: neStyles.diagInput,
+                    onChange: function(e) { setDiagInput(e.target.value); },
+                    onKeyDown: function(e) {
+                      if (e.key === 'Enter') addDiagnostic();
+                      if (e.key === 'Escape') { setAddingDiagnostic(false); setDiagInput(''); }
+                    }
+                  }),
+                  React.createElement('button', { style: neStyles.diagConfirmBtn, onClick: addDiagnostic }, 'Ajouter'),
+                  React.createElement('button', { style: neStyles.diagCancelBtn, onClick: function() { setAddingDiagnostic(false); setDiagInput(''); } }, 'Annuler')
+                )
+              : React.createElement('button', {
+                  style: neStyles.addSectionBtn,
+                  onClick: function() { setAddingDiagnostic(true); setDiagInput(''); }
+                },
+                  React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 18, color: '#1a5fd4' } }, 'local_hospital'),
+                  React.createElement('span', { style: { color: '#1a5fd4' } }, 'Ajouter un diagnostic')
+                )
+            }
+          </div>
 
         </div>
       }
@@ -578,7 +671,7 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
 // ---------------------------------------------------------
 // SectionTitle — titre de section éditable inline
 // ---------------------------------------------------------
-function SectionTitle({ value, onChange }) {
+function SectionTitle({ value, onChange, labelStyle }) {
   var _s = React.useState(false);
   var editing = _s[0], setEditing = _s[1];
   var _d = React.useState(value);
@@ -601,7 +694,7 @@ function SectionTitle({ value, onChange }) {
   }
 
   return React.createElement('span', {
-    style: Object.assign({}, neStyles.sectionLabel, neStyles.sectionLabelEditable),
+    style: Object.assign({}, neStyles.sectionLabel, neStyles.sectionLabelEditable, labelStyle || {}),
     title: 'Cliquer pour renommer',
     onClick: function() { setDraft(value); setEditing(true); }
   },
@@ -613,7 +706,7 @@ function SectionTitle({ value, onChange }) {
   );
 }
 
-function FloatField({ label, children, width, flex, error, input, type, select, options, value: controlledValue, onValueChange }) {
+function FloatField({ label, children, width, flex, error, input, type, select, options, value: controlledValue, onValueChange, onFocus: onFocusProp }) {
   const [focused, setFocused] = React.useState(false);
   const [internalValue, setInternalValue] = React.useState('');
   const value = controlledValue !== undefined ? controlledValue : internalValue;
@@ -659,7 +752,7 @@ function FloatField({ label, children, width, flex, error, input, type, select, 
             type={type || 'text'}
             value={value}
             onChange={handleChange}
-            onFocus={function() { setFocused(true); }}
+            onFocus={function() { setFocused(true); if (onFocusProp) onFocusProp(); }}
             onBlur={function() { setFocused(false); }} />
         ) : children}
       </div>
@@ -713,6 +806,13 @@ const neStyles = {
   toolsIconBtn: { width: 36, height: 36, border: '1.5px solid rgba(0,0,0,0.18)', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   chip: { display: 'inline-flex', alignItems: 'center', border: '1.5px solid rgba(0,0,0,0.18)', borderRadius: 20, padding: '6px 14px', cursor: 'pointer', whiteSpace: 'nowrap', font: "500 13px 'Inter', sans-serif", color: 'rgba(0,0,0,0.72)', background: '#fff', flexShrink: 0 },
   addSectionBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: 'rgba(0,0,0,0.45)', font: "400 13px 'Inter', sans-serif", padding: '4px 0', borderRadius: 6 },
+  diagTitleRow: { display: 'flex', alignItems: 'center', gap: 6 },
+  diagIcon: { fontSize: 16, color: '#1a5fd4' },
+  diagLabel: { fontWeight: 600, color: '#1a5fd4', fontSize: 15 },
+  addDiagForm: { display: 'inline-flex', alignItems: 'center', gap: 8 },
+  diagInput: { border: 'none', borderBottom: '1.5px solid #1a5fd4', outline: 'none', background: 'transparent', font: "400 14px 'Inter', sans-serif", color: 'rgba(0,0,0,0.85)', padding: '2px 4px', minWidth: 220 },
+  diagConfirmBtn: { border: 0, borderRadius: 6, background: '#1a5fd4', color: '#fff', padding: '4px 12px', cursor: 'pointer', font: "500 13px 'Inter', sans-serif" },
+  diagCancelBtn: { border: '1px solid #ccc', borderRadius: 6, background: 'transparent', color: 'rgba(0,0,0,0.55)', padding: '4px 12px', cursor: 'pointer', font: "400 13px 'Inter', sans-serif" },
 };
 
 window.NoteEditor = NoteEditor;

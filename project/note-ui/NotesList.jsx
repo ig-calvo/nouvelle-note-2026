@@ -8,6 +8,7 @@ const NOTE_ITEMS_TEMPLATE = [
     mode: "PRÉSENTIEL",
     title: "Infection urinaire",
     icons: ["graphic_eq", "link"],
+    diagnostics: ["Cystite aiguë non compliquée"],
     details: "Motif : Brûlures mictionnelles depuis 3 jours.\nSubjectif : Dysurie, pollakiurie, urgence mictionnelle. Pas de fièvre, pas de douleur lombaire, pas d'hématurie macroscopique. Premier épisode. Pas d'antécédent gynécologique pertinent. Pas enceinte.\nObjectif : Apyrétique. Abdomen souple, sensibilité sus-pubienne légère. Loges rénales indolores. Bandelette urinaire : Leu+++, Nit+, Sang trace.",
     conclusion: "Impression : Cystite aiguë non compliquée.\nPlan : Nitrofurantoïne 100 mg BID × 5 jours. Culture d'urine envoyée. Conseils d'hydratation. Retour si fièvre, douleur lombaire ou non-amélioration après 48h.",
     files: [
@@ -23,6 +24,7 @@ const NOTE_ITEMS_TEMPLATE = [
     mode: "PRÉSENTIEL",
     title: "Examen annuel",
     icons: ["graphic_eq", "pan_tool", "link", "hub"],
+    diagnostics: [],
     details: "Subjectif : Patiente sans plainte particulière. Se dit en bonne santé. Pas de symptôme cardiovasculaire, respiratoire ou digestif. Sommeil satisfaisant. Énergie correcte. Stress professionnel modéré lié au travail en milieu scolaire. Contraception orale bien tolérée, pas d'oubli. Objectif : TA 116/72. Pouls 70 bpm. Poids 61 kg. IMC 22,4. Examen physique général sans anomalie. Auscultation cardio-pulmonaire normale. Abdomen souple, indolore. Pas d'adénopathie. Examen gynécologique non effectué (refusé par la patiente, à reprendre). Impression : Bonne santé générale.",
     conclusion: "Pas de problème actif identifié. Plan : Renouvellement contraceptif oral pour 1 an. Rappel dépistage col utérin à planifier. Conseils hygiéno-diététiques généraux. Retour au besoin.",
     files: [
@@ -32,8 +34,11 @@ const NOTE_ITEMS_TEMPLATE = [
   },
 ];
 
-function NotesList({ doctorName = "Véronique Charland" }) {
-  const NOTE_ITEMS = NOTE_ITEMS_TEMPLATE.map(n => ({ ...n, author: n.author === "%%DOCTOR%%" ? doctorName : n.author }));
+function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
+  const NOTE_ITEMS = [
+    ...extraNotes,
+    ...NOTE_ITEMS_TEMPLATE.map(n => ({ ...n, author: n.author === "%%DOCTOR%%" ? doctorName : n.author })),
+  ];
   const [openNotes, setOpenNotes] = React.useState({});
   const [activeFilters, setActiveFilters] = React.useState(new Set());
 
@@ -129,18 +134,34 @@ function NotesList({ doctorName = "Véronique Charland" }) {
                 </div>
               )}
 
+              {/* Diagnostics */}
+              {n.diagnostics && n.diagnostics.length > 0 && (
+                <div style={nlStyles.diagRow}>
+                  {n.diagnostics.map((d, j) => (
+                    <span key={j} style={nlStyles.diagChip}>
+                      <span className="material-icons-outlined" style={nlStyles.diagChipIcon}>local_hospital</span>
+                      {d}
+                    </span>
+                  ))}
+                </div>
+              )}
+
               {/* Conclusion */}
-              <div style={nlStyles.conclLabelWrap}>
-                {isOpen
-                  ? <div style={nlStyles.conclLabelOpen}>Conclusion</div>
-                  : <div style={nlStyles.conclLabel}>CONCLUSION</div>
-                }
-              </div>
-              <div style={nlStyles.conclText}>
-                {n.conclusion.split("\n").map((line, j) => (
-                  <p key={j} style={{ margin: "0 0 4px 0" }}>{line}</p>
-                ))}
-              </div>
+              {n.conclusion ? (
+                <>
+                  <div style={nlStyles.conclLabelWrap}>
+                    {isOpen
+                      ? <div style={nlStyles.conclLabelOpen}>Conclusion</div>
+                      : <div style={nlStyles.conclLabel}>CONCLUSION</div>
+                    }
+                  </div>
+                  <div style={nlStyles.conclText}>
+                    {n.conclusion.split("\n").map((line, j) => (
+                      <p key={j} style={{ margin: "0 0 4px 0" }}>{line}</p>
+                    ))}
+                  </div>
+                </>
+              ) : null}
 
               {/* Files */}
               <div style={nlStyles.fileRow}>
@@ -253,6 +274,13 @@ const nlStyles = {
   detailsText: {
     fontSize: 15, color: "rgba(0,0,0,0.82)", lineHeight: 1.6,
   },
+  diagRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8, marginTop: 2 },
+  diagChip: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    background: '#e8f0fb', border: '1px solid #b3ccf0', borderRadius: 20,
+    padding: '4px 12px 4px 8px', fontSize: 13, color: '#1a5fd4', fontWeight: 500,
+  },
+  diagChipIcon: { fontSize: 14, color: '#1a5fd4' },
   conclLabelWrap: { marginTop: 4, marginBottom: 4 },
   conclLabel: {
     fontSize: 11, fontWeight: 500, letterSpacing: 0.8,
