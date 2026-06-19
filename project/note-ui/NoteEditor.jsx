@@ -393,46 +393,41 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
                     ref: defaultZoneRef,
                     className: 'ct-default-zone' + (dragging && drop && drop.type === 'default' ? ' is-target' : '')
                   },
-                    /* En-tête aligné comme les sections */
-                    React.createElement('div', { style: neStyles.secHead },
-                      React.createElement('span', null),
-                      React.createElement('div', { style: { display: 'flex', gap: 2, alignItems: 'center' } },
+                    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 4 } },
+                      React.createElement('div', { style: neStyles.chipsRow },
                         React.createElement('button', {
-                          style: Object.assign({}, neStyles.tbtn, toolZoneIndex === 0 ? { opacity: 0.25 } : {}),
-                          title: 'Remonter la zone d\'outils',
-                          disabled: toolZoneIndex === 0,
-                          onClick: moveToolZoneUp
-                        }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_upward')),
-                        React.createElement('button', {
-                          style: Object.assign({}, neStyles.tbtn, toolZoneIndex >= sections.length ? { opacity: 0.25 } : {}),
-                          title: 'Descendre la zone d\'outils',
-                          disabled: toolZoneIndex >= sections.length,
-                          onClick: moveToolZoneDown
-                        }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_downward'))
-                      )
-                    ),
-
-                    React.createElement('div', { style: neStyles.chipsRow },
+                          className: 'ct-toolsbtn',
+                          title: 'Outils cliniques',
+                          style: pickerOpen ? { background: '#eef1fb', color: 'var(--brand-primary, #1a5fd4)' } : undefined,
+                          onClick: function(e) {
+                            var r = e.currentTarget.getBoundingClientRect();
+                            if (pickerOpen) { setPickerOpen(false); } else { setPickerAnchor(r); setPickerOpen(true); }
+                          }
+                        }, React.createElement('span', { className: 'material-icons-outlined' }, 'handyman')),
+                        toolOpen
+                          ? React.createElement('button', { className: 'ct-chip', onClick: toggleTool },
+                              React.createElement('span', { className: 'material-icons-outlined' }, 'medical_information'),
+                              'Feuille de route - Symptômes urinaires'
+                            )
+                          : ['Assurance privée', 'Cardiologie', 'CNESST', 'Examen physique simple'].map(function(label) {
+                              return React.createElement('button', { key: label, className: 'ct-chip' },
+                                React.createElement('span', { className: 'material-icons-outlined' }, 'description'),
+                                label
+                              );
+                            })
+                      ),
                       React.createElement('button', {
-                        className: 'ct-toolsbtn',
-                        title: 'Outils cliniques',
-                        style: pickerOpen ? { background: '#eef1fb', color: 'var(--brand-primary, #1a5fd4)' } : undefined,
-                        onClick: function(e) {
-                          var r = e.currentTarget.getBoundingClientRect();
-                          if (pickerOpen) { setPickerOpen(false); } else { setPickerAnchor(r); setPickerOpen(true); }
-                        }
-                      }, React.createElement('span', { className: 'material-icons-outlined' }, 'handyman')),
-                      toolOpen
-                        ? React.createElement('button', { className: 'ct-chip', onClick: toggleTool },
-                            React.createElement('span', { className: 'material-icons-outlined' }, 'medical_information'),
-                            'Feuille de route - Symptômes urinaires'
-                          )
-                        : ['Assurance privée', 'Cardiologie', 'CNESST', 'Examen physique simple'].map(function(label) {
-                            return React.createElement('button', { key: label, className: 'ct-chip' },
-                              React.createElement('span', { className: 'material-icons-outlined' }, 'description'),
-                              label
-                            );
-                          })
+                        style: Object.assign({}, neStyles.tbtn, toolZoneIndex === 0 ? { opacity: 0.25 } : {}),
+                        title: 'Remonter la zone d\'outils',
+                        disabled: toolZoneIndex === 0,
+                        onClick: moveToolZoneUp
+                      }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_upward')),
+                      React.createElement('button', {
+                        style: Object.assign({}, neStyles.tbtn, toolZoneIndex >= sections.length ? { opacity: 0.25 } : {}),
+                        title: 'Descendre la zone d\'outils',
+                        disabled: toolZoneIndex >= sections.length,
+                        onClick: moveToolZoneDown
+                      }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_downward'))
                     ),
 
                     toolOpen && toolLoc === 'default'
