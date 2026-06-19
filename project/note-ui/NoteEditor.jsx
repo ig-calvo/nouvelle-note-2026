@@ -684,7 +684,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
                               placeholder: 'Appuyer sur « / » pour afficher les commandes',
                               value: sp.top, chips: chips,
                               onChange: function(v) { setSplitTop(sec.id, v); },
-                              onAddChip: onAddChip, onChipClick: onChipClick, linkedChipId: linkedChipId
+                              onAddChip: onAddChip, onChipClick: onChipClick, linkedChipId: linkedChipId, onAddSection: addSection
                             })
                           : null,
                         toolOpen
@@ -699,7 +699,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
                           placeholder: 'Appuyer sur « / » pour afficher les commandes',
                           value: sp.bot, chips: chips,
                           onChange: function(v) { setSplitBot(sec.id, v); },
-                          onAddChip: onAddChip, onChipClick: onChipClick, linkedChipId: linkedChipId
+                          onAddChip: onAddChip, onChipClick: onChipClick, linkedChipId: linkedChipId, onAddSection: addSection
                         })
                       )
                     : React.createElement(EditorField, {
@@ -707,7 +707,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
                         placeholder: 'Appuyer sur « / » pour afficher les commandes',
                         value: sec.content, chips: chips,
                         onChange: function(v) { setSectionContent(sec.id, v); },
-                        onAddChip: onAddChip, onChipClick: onChipClick, linkedChipId: linkedChipId
+                        onAddChip: onAddChip, onChipClick: onChipClick, linkedChipId: linkedChipId, onAddSection: addSection
                       }),
                   dragging && drop && drop.type === 'gap' && drop.field === sec.id
                     ? React.createElement('div', { className: 'ct-dropline', style: { top: drop.y } })

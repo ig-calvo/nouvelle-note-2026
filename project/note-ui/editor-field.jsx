@@ -284,7 +284,7 @@ function flattenRxResults(r) {
 // ---------------------------------------------------------
 // EditorField — one Quill instance per field
 // ---------------------------------------------------------
-function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChipClick, linkedChipId }) {
+function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChipClick, linkedChipId, onAddSection }) {
   const hostRef = useRefE(null);
   const quillRef = useRefE(null);
   const lastStoredRef = useRefE('');
@@ -485,6 +485,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
   const ghostRef = useRefE(null);ghostRef.current = ghost;
   const slashStateRef = useRefE(null);slashStateRef.current = slash;
   const onChipClickRef = useRefE(null);onChipClickRef.current = onChipClick;
+  const onAddSectionRef = useRefE(null);onAddSectionRef.current = onAddSection;
 
   // --- push external value updates into Quill (e.g. scenario change, toast revert)
   useEffectE(() => {
@@ -732,6 +733,17 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     const q = quillRef.current;if (!q) return;
     if (it.rxSearch || it.orderSearch) { enterOrderMode(it.kbd || 'rx'); return; }
     if (it.diagnosticEntry) { enterDiagnosticMode(''); return; }
+    if (it.addSection) {
+      const s = slashStateRef.current;
+      if (s) {
+        q.deleteText(s.startIndex, s.query.length + 1, 'silent');
+        slashFmtRef.current = null;
+      }
+      setSlash(null); slashStateRef.current = null;
+      setFuncMenu(null);
+      if (onAddSectionRef.current) onAddSectionRef.current();
+      return;
+    }
     const s = slashStateRef.current;
     const chipId = newChipId();
     silentRef.current = true;

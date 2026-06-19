@@ -371,6 +371,8 @@ const RECOGNIZERS = [
 const SLASH_ITEMS = [
   { key: 'diagnostic', section: 'Structure', icon: 'local_hospital', title: 'Diagnostic', desc: 'Créer une section diagnostic', kbd: 'dx',
     diagnosticEntry: true },
+  { key: 'add-section', section: 'Structure', icon: 'add', title: 'Ajouter une section', desc: 'Nouvelle section de texte libre', kbd: 'sec',
+    addSection: true },
   { key: 'prescription', section: 'Ajouter', icon: 'prescriptions', title: 'Prescriptions', desc: 'Rechercher et prescrire un médicament', kbd: 'rx',
     rxSearch: true },
   { key: 'lab', section: 'Ajouter', icon: 'science', title: 'Laboratoire', desc: 'FSC, TSH, bilan…', kbd: 'lab',
