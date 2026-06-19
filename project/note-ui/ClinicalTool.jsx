@@ -68,9 +68,16 @@ function CTSection({ id, name, collapsed, onToggle, children }) {
 const PHYS = ["Normal", "Anormal"];
 const SECTION_IDS = ["hist", "dec", "plan", "reco", "exam", "interv", "ci", "disc"];
 
-function ClinicalTool({ onClose, onHandleDown, dragging }) {
+function ClinicalTool({ onClose, onHandleDown, dragging, bodyCollapsed: bodyCollapsedProp, onBodyCollapseChange }) {
   const [collapsed, setCollapsed] = React.useState({});
-  const [bodyCollapsed, setBodyCollapsed] = React.useState(false);
+  const [bodyCollapsedInternal, setBodyCollapsedInternal] = React.useState(false);
+  const controlled = bodyCollapsedProp !== undefined;
+  const bodyCollapsed = controlled ? bodyCollapsedProp : bodyCollapsedInternal;
+  function setBodyCollapsed(val) {
+    const next = typeof val === 'function' ? val(bodyCollapsed) : val;
+    if (controlled) { onBodyCollapseChange && onBodyCollapseChange(next); }
+    else { setBodyCollapsedInternal(next); }
+  }
   const [fav, setFav] = React.useState(false);
   const [effDate] = React.useState(function () { return new Date().toISOString().slice(0, 10); });
 

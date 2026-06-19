@@ -27,8 +27,12 @@ const CLINICAL_TOOLS = [
 function ClinicalToolPicker({ anchorRect, onClose, onSelect }) {
   const [query, setQuery] = React.useState('');
   const [tab, setTab] = React.useState('all');
+  const DEFAULT_FAVORITES = ['itu', 'ep-gabarit', 'em-gabarit', 'douleur-thoracique', 'prevention'];
   const [favorites, setFavorites] = React.useState(function () {
-    try { return JSON.parse(localStorage.getItem('ct-favorites') || '[]'); } catch (e) { return []; }
+    try {
+      const stored = localStorage.getItem('ct-favorites');
+      return stored !== null ? JSON.parse(stored) : DEFAULT_FAVORITES;
+    } catch (e) { return DEFAULT_FAVORITES; }
   });
   const [hovered, setHovered] = React.useState(null);
   const [inputFocused, setInputFocused] = React.useState(false);
