@@ -741,7 +741,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       }
       setSlash(null); slashStateRef.current = null;
       setFuncMenu(null);
-      if (onAddSectionRef.current) onAddSectionRef.current();
+      if (onAddSectionRef.current) onAddSectionRef.current(id);
       return;
     }
     const s = slashStateRef.current;
@@ -1085,7 +1085,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         onPickTool={chooseSlashItem}
         onPickOrder={(kbd) => enterOrderMode(kbd)}
         onPickFile={() => { fileInputRef.current && fileInputRef.current.click(); }}
-        onAddSection={onAddSectionRef.current}
+        onAddSection={() => onAddSectionRef.current && onAddSectionRef.current(id)}
         onClose={() => setFuncMenu(null)} />
 
       }

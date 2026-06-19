@@ -421,9 +421,18 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
       setToolZoneIndex(function(i) { return Math.max(0, i - 1); });
     }
   }
-  function addSection() {
-    var id = 'sec-' + Date.now();
-    setSections(function(secs) { return secs.concat([{ id: id, title: 'Nouvelle section', content: '' }]); });
+  function addSection(afterFieldId) {
+    var newId = 'sec-' + Date.now();
+    setSections(function(secs) {
+      var idx = afterFieldId
+        ? secs.findIndex(function(s) { return s.id === afterFieldId || afterFieldId.startsWith(s.id + '-'); })
+        : -1;
+      var newSec = { id: newId, title: 'Nouvelle section', content: '' };
+      if (idx === -1) return secs.concat([newSec]);
+      var result = secs.slice();
+      result.splice(idx, 0, newSec);
+      return result;
+    });
   }
 
   function addDiagnostic() {
