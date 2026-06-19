@@ -708,7 +708,7 @@ const neStyles = {
   secTools: { display: 'flex', gap: 2 },
   tbtn: { width: 28, height: 28, border: 0, background: 'transparent', borderRadius: 6, color: 'rgba(0,0,0,0.38)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   divider: { height: 1, background: '#eee', margin: '12px 0' },
-  chipsRow: { display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', paddingBottom: 4 },
+  chipsRow: { flex: 1, display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', paddingBottom: 4 },
   zoneControls: { display: 'flex', gap: 2, marginBottom: 4 },
   toolsIconBtn: { width: 36, height: 36, border: '1.5px solid rgba(0,0,0,0.18)', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   chip: { display: 'inline-flex', alignItems: 'center', border: '1.5px solid rgba(0,0,0,0.18)', borderRadius: 20, padding: '6px 14px', cursor: 'pointer', whiteSpace: 'nowrap', font: "500 13px 'Inter', sans-serif", color: 'rgba(0,0,0,0.72)', background: '#fff', flexShrink: 0 },
