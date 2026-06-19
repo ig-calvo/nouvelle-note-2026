@@ -416,18 +416,20 @@ function NoteEditor({ isOpen, onOpen, smartActive }) {
                               );
                             })
                       ),
-                      React.createElement('button', {
-                        style: Object.assign({}, neStyles.tbtn, toolZoneIndex === 0 ? { opacity: 0.25 } : {}),
-                        title: 'Remonter la zone d\'outils',
-                        disabled: toolZoneIndex === 0,
-                        onClick: moveToolZoneUp
-                      }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_upward')),
-                      React.createElement('button', {
-                        style: Object.assign({}, neStyles.tbtn, toolZoneIndex >= sections.length ? { opacity: 0.25 } : {}),
-                        title: 'Descendre la zone d\'outils',
-                        disabled: toolZoneIndex >= sections.length,
-                        onClick: moveToolZoneDown
-                      }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_downward'))
+                      toolZoneIndex > 0
+                        ? React.createElement('button', {
+                            style: neStyles.tbtn,
+                            title: 'Remonter la zone d\'outils',
+                            onClick: moveToolZoneUp
+                          }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_upward'))
+                        : null,
+                      toolZoneIndex < sections.length
+                        ? React.createElement('button', {
+                            style: neStyles.tbtn,
+                            title: 'Descendre la zone d\'outils',
+                            onClick: moveToolZoneDown
+                          }, React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 16 } }, 'arrow_downward'))
+                        : null
                     ),
 
                     toolOpen && toolLoc === 'default'
