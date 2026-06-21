@@ -34,6 +34,125 @@ const NOTE_ITEMS_TEMPLATE = [
   },
 ];
 
+function roChipLabel(entity) {
+  var d = entity.details || {};
+  if (entity.type === 'prescription') {
+    var rx = entity.rx || {};
+    var name = rx.name || d.molecule || entity.label;
+    var dose = rx.dose || (d.dose ? d.dose + ' ' + (d.unit || '') : '');
+    var freq = d.frequency || rx.sig || '';
+    return [name, dose, freq].filter(Boolean).join(' ');
+  }
+  if (entity.type === 'lab') return d.tests && d.tests.length ? d.tests.join(', ') : entity.label;
+  if (entity.type === 'imaging') return [d.modality, d.region].filter(Boolean).join(' ') || entity.label;
+  if (entity.type === 'referral') return d.specialty || entity.label;
+  if (entity.type === 'problem') return d.name || entity.label;
+  if (entity.type === 'instructions') return d.title || entity.label;
+  return entity.label;
+}
+
+function roChipStyle(type) {
+  var isRx = type === 'prescription';
+  var isLab = type === 'lab';
+  var isImg = type === 'imaging';
+  var isRef = type === 'referral';
+  return {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    padding: isRx || isLab || isImg || isRef ? '2px 8px 2px 6px' : '2px 9px 2px 7px',
+    borderRadius: isRx || isLab || isImg || isRef ? 7 : 6,
+    background: isRx || isLab || isImg || isRef ? '#fff' : 'var(--brand-primary-container, #e8e8ff)',
+    border: isRx || isLab || isImg || isRef ? '1px solid #b9b9d0' : '1px solid var(--brand-primary, #3f3ec8)',
+    color: isRx || isLab || isImg || isRef ? 'rgba(0,0,0,0.8)' : 'var(--brand-primary, #3f3ec8)',
+    fontSize: 13, fontWeight: 500, verticalAlign: 'baseline',
+    whiteSpace: 'nowrap', margin: '0 2px', lineHeight: 1.5,
+    boxShadow: '0 1px 2px rgba(37,36,94,0.06)',
+  };
+}
+
+// Render one line's content (plain text + inline chip pills) into an array.
+function renderInline(text, chips, keyPrefix) {
+  var out = [];
+  (text || '').split(/(\{\{CHIP:[^}]+\}\})/g).forEach(function(p, i) {
+    var m = /^\{\{CHIP:([^}]+)\}\}$/.exec(p);
+    if (m) {
+      var chip = chips && chips[m[1]];
+      if (!chip || !chip.entity) return;
+      var ent = chip.entity;
+      var type = ent.type;
+      var isPrx = type === 'prescription';
+      var iconMap = { lab: 'science', imaging: 'radiology', referral: 'person_add', problem: 'flag', instructions: 'menu_book', diagnostic: 'local_hospital', file: 'attach_file' };
+      var label = roChipLabel(ent);
+      var iconColor = type === 'lab' ? '#1975d1' : type === 'imaging' ? '#7a3ec2' : type === 'referral' ? '#2e7d32' : '#25245E';
+      out.push(
+        <span key={keyPrefix + '-chip-' + i} style={roChipStyle(type)}>
+          {isPrx
+            ? <span style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: 15, color: '#25245E', lineHeight: 1 }}>℞</span>
+            : <span className="material-symbols-outlined" style={{ fontSize: 14, color: iconColor }}>{iconMap[type] || 'bookmark'}</span>
+          }
+          <span>{label}</span>
+        </span>
+      );
+    } else if (p) {
+      out.push(<React.Fragment key={keyPrefix + '-t-' + i}>{p}</React.Fragment>);
+    }
+  });
+  return out;
+}
+
+// Render a run of lines (with <br> between) into an array of elements.
+function renderLines(lines, chips, keyPrefix) {
+  var out = [];
+  lines.forEach(function(ln, li) {
+    if (li > 0) out.push(<br key={keyPrefix + '-br-' + li} />);
+    renderInline(ln, chips, keyPrefix + '-' + li).forEach(function(e) { out.push(e); });
+  });
+  return out;
+}
+
+const RO_DIAG_OPEN = /^\{\{DIAG:([A-Za-z0-9_-]+)\|([^}]*)\}\}$/;
+
+// Read-only section renderer: walks lines, grouping {{DIAG:..}}…{{/DIAG}}
+// regions into blue callout blocks; everything else is normal text + chips.
+function SectionContent({ content, chips }) {
+  var lines = (content || '').split('\n');
+  var blocks = [];          // {type:'text', lines} | {type:'diag', name, lines}
+  var textRun = [];
+  var cur = null;
+  function flushText() { if (textRun.length) { blocks.push({ type: 'text', lines: textRun }); textRun = []; } }
+  lines.forEach(function(line) {
+    var mo = RO_DIAG_OPEN.exec(line);
+    if (mo) {
+      flushText();
+      var nm = '';
+      try { nm = decodeURIComponent(mo[2]); } catch (e) { nm = mo[2]; }
+      cur = { type: 'diag', name: nm, lines: [] };
+      blocks.push(cur);
+      return;
+    }
+    if (line === '{{/DIAG}}') { cur = null; return; }
+    if (cur) cur.lines.push(line); else textRun.push(line);
+  });
+  flushText();
+
+  var els = blocks.map(function(b, bi) {
+    if (b.type === 'text') {
+      var hasContent = b.lines.some(function(l) { return l.trim() || /\{\{CHIP:/.test(l); });
+      if (!hasContent) return null;
+      return <div key={'tb-' + bi}>{renderLines(b.lines, chips, 'tb' + bi)}</div>;
+    }
+    return (
+      <div key={'db-' + bi} style={nlStyles.roDiag}>
+        <div style={nlStyles.roDiagHeader}>
+          <span className="material-icons-outlined" style={nlStyles.roDiagIcon}>local_hospital</span>
+          <span style={nlStyles.roDiagName}>{b.name}</span>
+        </div>
+        <div style={nlStyles.roDiagBody}>{renderLines(b.lines, chips, 'db' + bi)}</div>
+      </div>
+    );
+  });
+  return <React.Fragment>{els}</React.Fragment>;
+}
+
 function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
   const NOTE_ITEMS = [
     ...extraNotes,
@@ -122,8 +241,23 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
                 </div>
               </div>
 
-              {/* Expanded: Détails de la note */}
-              {isOpen && (
+              {/* Expanded: sections éditeur (nouvelles notes) ou détails texte (notes template) */}
+              {isOpen && n.sections && n.sections.length > 0 ? (
+                n.sections.map(function(sec, si) {
+                  var hasContent = sec.content && sec.content.trim();
+                  if (!hasContent) return null;
+                  return (
+                    <div key={sec.id || si} style={nlStyles.detailsSection}>
+                      {(n.sections.length > 1 || sec.type === 'diagnostic') && (
+                        <div style={nlStyles.detailsLabel}>{sec.title}</div>
+                      )}
+                      <div style={nlStyles.detailsText}>
+                        <SectionContent content={sec.content} chips={n.chips} />
+                      </div>
+                    </div>
+                  );
+                })
+              ) : isOpen && n.details ? (
                 <div style={nlStyles.detailsSection}>
                   <div style={nlStyles.detailsLabel}>Détails de la note</div>
                   <div style={nlStyles.detailsText}>
@@ -132,7 +266,7 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
                     ))}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Diagnostics — always visible (collapsed only shows these) */}
               {n.diagnostics && n.diagnostics.length > 0 && (
@@ -146,8 +280,8 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
                 </div>
               )}
 
-              {/* Conclusion — only when expanded */}
-              {isOpen && n.conclusion ? (
+              {/* Conclusion — uniquement pour les notes template (n.conclusion) */}
+              {isOpen && !n.sections && n.conclusion ? (
                 <>
                   <div style={nlStyles.conclLabelWrap}>
                     <div style={nlStyles.conclLabelOpen}>Conclusion</div>
@@ -280,6 +414,14 @@ const nlStyles = {
     padding: '4px 12px 4px 8px', fontSize: 13, color: '#1a5fd4', fontWeight: 500,
   },
   diagChipIcon: { fontSize: 14, color: '#1a5fd4' },
+  roDiag: { margin: '8px 0', border: '1px solid #b3ccf0', borderRadius: 10, overflow: 'hidden' },
+  roDiagHeader: {
+    display: 'flex', alignItems: 'center', gap: 7,
+    background: '#e8f0fb', padding: '6px 12px',
+  },
+  roDiagIcon: { fontSize: 16, color: '#1a5fd4' },
+  roDiagName: { fontSize: 14, fontWeight: 600, color: '#1a5fd4' },
+  roDiagBody: { background: '#f5f9ff', padding: '8px 12px', fontSize: 15, color: 'rgba(0,0,0,0.82)', lineHeight: 1.6 },
   conclLabelWrap: { marginTop: 4, marginBottom: 4 },
   conclLabel: {
     fontSize: 11, fontWeight: 500, letterSpacing: 0.8,

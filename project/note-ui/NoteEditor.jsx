@@ -1,4 +1,23 @@
 /* global React */
+// Collect diagnostic names from section contents by scanning the {{DIAG:id|name}}
+// region markers (diagnostics now live INSIDE sections rather than being sections).
+function scanDiagNames(sections) {
+  var re = /\{\{DIAG:[A-Za-z0-9_-]+\|([^}]*)\}\}/g;
+  var seen = {};
+  var out = [];
+  (sections || []).forEach(function(s) {
+    var m;
+    re.lastIndex = 0;
+    while ((m = re.exec(s.content || ''))) {
+      var nm = '';
+      try { nm = decodeURIComponent(m[1]); } catch (e) { nm = m[1]; }
+      nm = nm.trim();
+      if (nm && !seen[nm]) { seen[nm] = true; out.push(nm); }
+    }
+  });
+  return out;
+}
+
 function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
   const DEFAULT_SECTIONS = [
     { id: 'sec-details',    title: 'Détails de la consultation', content: '' },
@@ -32,8 +51,6 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
   const [toolBodyCollapsed, setToolBodyCollapsed] = React.useState(false);
 
   const [raison, setRaison] = React.useState('');
-  const [addingDiagnostic, setAddingDiagnostic] = React.useState(false);
-  const [diagInput, setDiagInput] = React.useState('');
 
   // --- drag-to-place tool state
   // toolLoc: 'default' | sectionId
@@ -58,38 +75,15 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
     return function() { window.removeEventListener('ct-picker-open', onPickerOpen); };
   }, []);
 
-  // Ref kept up-to-date every render so the event handler always uses fresh setters
-  const addDiagCallbackRef = React.useRef(null);
-  addDiagCallbackRef.current = function(name) {
-    if (name && name.trim()) {
-      var label = name.trim();
-      var id = 'diag-' + Date.now();
-      setSections(function(secs) { return secs.concat([{ id: id, type: 'diagnostic', title: label, content: '' }]); });
-      setTags(function(ts) { return ts.indexOf(label) === -1 ? ts.concat([label]) : ts; });
-      setShowTags(true);
-    } else {
-      setDiagInput('');
-      setAddingDiagnostic(true);
-    }
-  };
-
-  React.useEffect(function() {
-    function handler(e) {
-      var name = (e.detail && e.detail.name) || '';
-      if (addDiagCallbackRef.current) addDiagCallbackRef.current(name);
-    }
-    window.addEventListener('note:add-diagnostic', handler);
-    return function() { window.removeEventListener('note:add-diagnostic', handler); };
-  }, []);
-
-  // Dispatch chip counts whenever chips or sections change (drives footer counters)
+  // Dispatch chip counts whenever chips or sections change (drives footer counters).
+  // Diagnostics are counted from the {{DIAG:..}} region markers in section content.
   React.useEffect(function() {
     var counts = {};
     Object.values(chips).forEach(function(c) {
       var t = c.entity && c.entity.type;
       if (t) counts[t] = (counts[t] || 0) + 1;
     });
-    var dxCount = sections.filter(function(s) { return s.type === 'diagnostic'; }).length;
+    var dxCount = scanDiagNames(sections).length;
     if (dxCount) counts.diagnostic = dxCount;
     window.dispatchEvent(new CustomEvent('note:chips-change', { detail: counts }));
   }, [chips, sections]);
@@ -441,19 +435,6 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
     });
   }
 
-  function addDiagnostic() {
-    var label = diagInput.trim();
-    if (!label) { setAddingDiagnostic(false); return; }
-    var id = 'diag-' + Date.now();
-    setSections(function(secs) {
-      return secs.concat([{ id: id, type: 'diagnostic', title: label, content: '' }]);
-    });
-    setTags(function(ts) { return ts.indexOf(label) === -1 ? ts.concat([label]) : ts; });
-    setShowTags(true);
-    setAddingDiagnostic(false);
-    setDiagInput('');
-  }
-
   function resetNote() {
     setSections(DEFAULT_SECTIONS.map(function(s) { return Object.assign({}, s); }));
     setRaison('');
@@ -463,22 +444,21 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
     setToolLoc('default');
     setToolZoneIndex(1);
     setShowTags(false);
-    setAddingDiagnostic(false);
-    setDiagInput('');
     setToolOpen(false);
     setToolBodyCollapsed(false);
     setInlineEdit(null);
   }
 
   function handleComplete() {
-    var diagSections = sections.filter(function(s) { return s.type === 'diagnostic'; });
     var data = {
       raison: raison,
       date: noteDate,
       time: noteTime,
       visitType: visitType,
       tags: tags,
-      diagnostics: diagSections.map(function(s) { return s.title; }),
+      diagnostics: scanDiagNames(sections),
+      sections: sections,
+      chips: chips,
     };
     resetNote();
     if (onComplete) onComplete(data);
@@ -731,30 +711,6 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
               )
             );
           })}
-
-          <div style={neStyles.divider} />
-
-          {/* Formulaire diagnostic (déclenché par /dx) */}
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-            {addingDiagnostic &&
-              React.createElement('div', { style: neStyles.addDiagForm },
-                React.createElement('span', { className: 'material-icons-outlined', style: { fontSize: 18, color: '#1a5fd4', flexShrink: 0 } }, 'local_hospital'),
-                React.createElement('input', {
-                  autoFocus: true,
-                  placeholder: 'Nom du diagnostic…',
-                  value: diagInput,
-                  style: neStyles.diagInput,
-                  onChange: function(e) { setDiagInput(e.target.value); },
-                  onKeyDown: function(e) {
-                    if (e.key === 'Enter') addDiagnostic();
-                    if (e.key === 'Escape') { setAddingDiagnostic(false); setDiagInput(''); }
-                  }
-                }),
-                React.createElement('button', { style: neStyles.diagConfirmBtn, onClick: addDiagnostic }, 'Ajouter'),
-                React.createElement('button', { style: neStyles.diagCancelBtn, onClick: function() { setAddingDiagnostic(false); setDiagInput(''); } }, 'Annuler')
-              )
-            }
-          </div>
 
         </div>
       }

@@ -9,6 +9,8 @@ const { useState: useStateE, useEffect: useEffectE, useRef: useRefE } = React;
 
 let _chipSeq = 1;
 function newChipId() {return 'c' + _chipSeq++;}
+let _diagSeq = 1;
+function newDiagId() {return 'd' + _diagSeq++;}
 
 // ---------------------------------------------------------
 // Register the chip embed blot with Quill (once, globally)
@@ -200,31 +202,163 @@ function newChipId() {return 'c' + _chipSeq++;}
 })();
 
 // ---------------------------------------------------------
-// Convert stored value ("text {{CHIP:cid}} more\n...") to Quill delta
+// Diagnostic region — a Notion-callout-style block that lives INSIDE a
+// section's flow. One single cursor flows: text → [header] → body lines → text.
+//   • DiagnosticHeader : a standalone, non-editable block (icon + name +
+//                        "promote to problem" button). Atomic (length 1).
+//   • DiagnosticBody   : a line-level block format ('diagnostic' = id) on PLAIN
+//                        blocks (no container) — same-id lines are grouped into
+//                        one box via CSS adjacency. Plain blocks (not a nested
+//                        container) keep keyboard input reliable in the line
+//                        right after the header.
 // ---------------------------------------------------------
-function storedToDelta(stored, chips) {
-  const ops = [];
-  const parts = (stored || '').split(/(\{\{CHIP:[^}]+\}\})/g);
-  for (const p of parts) {
-    const m = /^\{\{CHIP:([^}]+)\}\}$/.exec(p);
-    if (m) {
-      const chip = chips[m[1]];
-      if (chip) {
-        const meta = window.NOTE_DATA.ENTITY_TYPES[chip.entity.type] || {};
-        ops.push({ insert: { chip: {
-              cid: m[1],
-              type: chip.entity.type,
-              label: chip.entity.label,
-              icon: meta.icon || 'bookmark',
-              rx: chip.entity.rx || undefined,
-              details: chip.entity.details || undefined
-            } } });
+(function registerDiagnosticBlots() {
+  if (window.__diagBlotsRegistered) return;
+  const Block = Quill.import('blots/block');
+  const BlockEmbed = Quill.import('blots/block/embed');
+
+  // Body lines are PLAIN blocks (no Container wrapper) carrying a data-diag-id —
+  // the canonical Quill "block-embed + block" arrangement, which keeps keyboard
+  // input working in the line right after the header. Consecutive same-id lines
+  // are grouped into a visual box purely via CSS adjacency.
+  class DiagnosticBody extends Block {
+    static blotName = 'diagnostic';
+    static tagName = 'div';
+    static className = 'ql-diag-line';
+    static create(value) {
+      const node = super.create();
+      node.setAttribute('data-diag-id', value || '');
+      return node;
+    }
+    static formats(node) {
+      return node.getAttribute('data-diag-id') || undefined;
+    }
+    format(name, value) {
+      if (name === this.statics.blotName && value) {
+        this.domNode.setAttribute('data-diag-id', value);
+      } else {
+        super.format(name, value);
       }
-    } else if (p) {
-      ops.push({ insert: p });
     }
   }
-  if (ops.length === 0 || typeof ops[ops.length - 1].insert !== 'string' || !ops[ops.length - 1].insert.endsWith('\n')) {
+
+  class DiagnosticHeader extends BlockEmbed {
+    static blotName = 'diagnostic-header';
+    static tagName = 'div';
+    static className = 'ql-diag-header';
+    static create(value) {
+      const node = super.create();
+      value = value || {};
+      node.setAttribute('data-diag-id', value.id || '');
+      node.setAttribute('contenteditable', 'false');
+      const ic = document.createElement('span');
+      ic.className = 'material-symbols-outlined ql-diag-ic';
+      ic.textContent = 'local_hospital';
+      node.appendChild(ic);
+      const nm = document.createElement('span');
+      nm.className = 'ql-diag-name';
+      nm.setAttribute('data-diag-id', value.id || '');
+      nm.textContent = value.name || 'Diagnostic';
+      node.appendChild(nm);
+      const btn = document.createElement('button');
+      btn.className = 'ql-diag-promote';
+      btn.setAttribute('data-diag-id', value.id || '');
+      btn.setAttribute('type', 'button');
+      btn.setAttribute('title', 'Promouvoir en problème au sommaire');
+      const bic = document.createElement('span');
+      bic.className = 'material-symbols-outlined';
+      bic.textContent = 'flag';
+      btn.appendChild(bic);
+      const blbl = document.createElement('span');
+      blbl.textContent = 'Promouvoir';
+      btn.appendChild(blbl);
+      node.appendChild(btn);
+      return node;
+    }
+    static value(node) {
+      const nm = node.querySelector('.ql-diag-name');
+      return {
+        id: node.getAttribute('data-diag-id') || '',
+        name: nm ? nm.textContent : ''
+      };
+    }
+    length() { return 1; }
+  }
+
+  Quill.register(DiagnosticBody, true);
+  Quill.register(DiagnosticHeader, true);
+
+  // Allow the header block embed as a direct child of the scroll.
+  const Scroll = Quill.import('blots/scroll');
+  if (Scroll.allowedChildren && Scroll.allowedChildren.indexOf(DiagnosticHeader) === -1) {
+    Scroll.allowedChildren.push(DiagnosticHeader);
+  }
+  window.__diagBlotsRegistered = true;
+})();
+
+// ---------------------------------------------------------
+// Convert stored value to Quill delta.
+// Stored format: flat string with inline "{{CHIP:cid}}" markers, plus
+// per-line diagnostic-region sentinels:
+//     texte avant
+//     {{DIAG:<id>|<encodedName>}}
+//     ligne de corps {{CHIP:cX}}
+//     {{/DIAG}}
+//     texte apres
+// The diagnostic attribute lands on each body line's terminating newline;
+// the header is a block embed. encodeURIComponent on the name keeps the
+// marker regex unambiguous (no '}' '|' '{' newline inside).
+// ---------------------------------------------------------
+const DIAG_OPEN_RE = /^\{\{DIAG:([A-Za-z0-9_-]+)\|([^}]*)\}\}$/;
+
+function storedToDelta(stored, chips) {
+  const ops = [];
+  const lines = (stored || '').split('\n');
+  let curDiag = null;
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    const mo = DIAG_OPEN_RE.exec(line);
+    if (mo) {
+      let nm = '';
+      try { nm = decodeURIComponent(mo[2]); } catch (e) { nm = mo[2]; }
+      ops.push({ insert: { 'diagnostic-header': { id: mo[1], name: nm } } });
+      curDiag = mo[1];
+      continue;
+    }
+    if (line === '{{/DIAG}}') { curDiag = null; continue; }
+    // normal / body line: split on chip markers
+    const parts = line.split(/(\{\{CHIP:[^}]+\}\})/g);
+    for (const p of parts) {
+      const cm = /^\{\{CHIP:([^}]+)\}\}$/.exec(p);
+      if (cm) {
+        const chip = chips[cm[1]];
+        if (chip) {
+          const meta = window.NOTE_DATA.ENTITY_TYPES[chip.entity.type] || {};
+          ops.push({ insert: { chip: {
+            cid: cm[1],
+            type: chip.entity.type,
+            label: chip.entity.label,
+            icon: meta.icon || 'bookmark',
+            rx: chip.entity.rx || undefined,
+            details: chip.entity.details || undefined
+          } } });
+        }
+      } else if (p) {
+        ops.push({ insert: p });
+      }
+    }
+    if (curDiag != null) ops.push({ insert: '\n', attributes: { diagnostic: curDiag } });
+    else ops.push({ insert: '\n' });
+  }
+  // Ensure the doc ends with a normal trailing line (Quill keeps a trailing \n,
+  // and the caret must never be trapped under a region).
+  const last = ops[ops.length - 1];
+  if (ops.length === 0) {
+    ops.push({ insert: '\n' });
+  } else if (last.insert && last.insert['diagnostic-header']) {
+    ops.push({ insert: '\n', attributes: { diagnostic: last.insert['diagnostic-header'].id } });
+    ops.push({ insert: '\n' });
+  } else if (last.insert === '\n' && last.attributes && last.attributes.diagnostic) {
     ops.push({ insert: '\n' });
   }
   return { ops };
@@ -244,16 +378,59 @@ function caretFromDelta(delta) {
   return idx;
 }
 
-// Delta → stored string (with chip markers); preserves newlines.
+// Delta → stored string (with chip markers + diagnostic sentinels).
+// The diagnostic attribute lives on each body line's newline op, so we walk
+// line records and emit {{DIAG:..}} / {{/DIAG}} on region transitions.
 function deltaToStored(delta) {
-  let out = '';
-  for (const op of delta.ops || []) {
-    if (typeof op.insert === 'string') out += op.insert;else
-    if (op.insert && op.insert.chip) out += '{{CHIP:' + op.insert.chip.cid + '}}';
+  // Phase 1: ops → line records.
+  const recs = []; // {type:'line', text, diag} | {type:'header', id, name}
+  let buf = '';
+  for (const op of (delta.ops || [])) {
+    if (op.insert == null) continue;
+    if (typeof op.insert === 'string') {
+      const s = op.insert;
+      const diag = (op.attributes && op.attributes.diagnostic) || null;
+      let start = 0;
+      for (let i = 0; i < s.length; i++) {
+        if (s[i] === '\n') {
+          buf += s.slice(start, i);
+          recs.push({ type: 'line', text: buf, diag: diag });
+          buf = '';
+          start = i + 1;
+        }
+      }
+      buf += s.slice(start);
+    } else if (op.insert.chip) {
+      buf += '{{CHIP:' + op.insert.chip.cid + '}}';
+    } else if (op.insert['diagnostic-header']) {
+      if (buf) { recs.push({ type: 'line', text: buf, diag: null }); buf = ''; }
+      const h = op.insert['diagnostic-header'];
+      recs.push({ type: 'header', id: h.id || '', name: h.name || '' });
+    }
+    // transient embeds (orderbadge) are intentionally dropped
   }
-  // Quill always keeps a trailing \n; strip it for storage parity
-  if (out.endsWith('\n')) out = out.slice(0, -1);
-  return out;
+  if (buf) recs.push({ type: 'line', text: buf, diag: null });
+
+  // Phase 2: emit sentinels on diagnostic transitions.
+  const out = [];
+  let cur = null;
+  for (const r of recs) {
+    if (r.type === 'header') {
+      if (cur != null) out.push('{{/DIAG}}');
+      out.push('{{DIAG:' + r.id + '|' + encodeURIComponent(r.name) + '}}');
+      cur = r.id;
+    } else {
+      if (r.diag !== cur) {
+        if (cur != null) { out.push('{{/DIAG}}'); cur = null; }
+        if (r.diag != null) cur = r.diag; // body line without a header (defensive)
+      }
+      out.push(r.text);
+    }
+  }
+  if (cur != null) out.push('{{/DIAG}}');
+  let result = out.join('\n');
+  if (result.endsWith('\n')) result = result.slice(0, -1);
+  return result;
 }
 
 // Plain text (for recognizer) — chip = 1 char placeholder
@@ -261,7 +438,8 @@ function deltaToPlain(delta) {
   let out = '';
   for (const op of delta.ops || []) {
     if (typeof op.insert === 'string') out += op.insert;else
-    if (op.insert && op.insert.chip) out += '\u0000';
+    if (op.insert && op.insert.chip) out += '\u0000';else
+    if (op.insert && op.insert['diagnostic-header']) out += '\u0000';
   }
   if (out.endsWith('\n')) out = out.slice(0, -1);
   return out;
@@ -299,6 +477,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
   const [funcMenu, setFuncMenu] = useStateE(null); // { top, left } — opened from the + button
   const [, setFavBump] = useStateE(0); // re-render when favorites toggle
   const [addBtnOffset, setAddBtnOffset] = useStateE(null); // null = CSS default (unfocused)
+  const [diagRename, setDiagRename] = useStateE(null); // { id, value, pos:{top,left} } — diagnostic rename popover
   const addBtnRef = useRefE(null);
   const fileInputRef = useRefE(null);
   const slashFmtRef = useRefE(null); // {index, length} of the highlighted "/command" run
@@ -356,7 +535,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       theme: 'snow',
       placeholder,
       modules: { toolbar: false, keyboard: { bindings: {} } },
-      formats: ['bold', 'italic', 'underline', 'strike', 'list', 'indent', 'header', 'blockquote', 'code-block', 'link', 'color', 'background', 'chip', 'slashcmd', 'orderbadge']
+      formats: ['bold', 'italic', 'underline', 'strike', 'list', 'indent', 'header', 'blockquote', 'code-block', 'link', 'color', 'background', 'chip', 'slashcmd', 'orderbadge', 'diagnostic', 'diagnostic-header']
     });
     quillRef.current = q;
 
@@ -390,8 +569,78 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       updateGhostAndSlash(q);
     });
 
+    // --- Diagnostic region keyboard handling (single continuous cursor) ---
+    // Enter on the last, empty body line leaves the region (Notion semantics):
+    // drop the diagnostic format so the new line rejoins normal flow below.
+    function diagId(blot) {
+      return blot && blot.domNode && blot.domNode.getAttribute
+        ? blot.domNode.getAttribute('data-diag-id') : null;
+    }
+    function isHeaderBlot(blot) {
+      return blot && blot.statics && blot.statics.blotName === 'diagnostic-header';
+    }
+    q.keyboard.addBinding({ key: 'Enter', collapsed: true, format: ['diagnostic'] }, function (range) {
+      const info = q.getLine(range.index);
+      const line = info && info[0];
+      if (!line) return true;
+      const id = diagId(line);
+      const isEmpty = line.length() <= 1;          // only the trailing \n
+      const isLast = diagId(line.next) !== id;     // next block is not part of this region
+      if (isEmpty && isLast) {
+        q.formatLine(range.index, 1, 'diagnostic', false, 'user');
+        return false;                              // handled — don't insert a new body line
+      }
+      return true;                                 // normal Enter → new body line in the region
+    });
+    // Backspace at the start of an empty, only body line removes the whole region.
+    q.keyboard.addBinding({ key: 'Backspace', collapsed: true, offset: 0, format: ['diagnostic'] }, function (range) {
+      const info = q.getLine(range.index);
+      const line = info && info[0];
+      if (!line) return true;
+      const id = diagId(line);
+      const prev = line.prev;
+      const isFirst = diagId(prev) !== id;         // first line of this region
+      const isLast = diagId(line.next) !== id;
+      const isEmpty = line.length() <= 1;
+      if (isFirst && isEmpty && isLast) {
+        const lineIdx = q.getIndex(line);
+        if (isHeaderBlot(prev)) {
+          q.deleteText(Math.max(0, lineIdx - 1), 2, 'user'); // header + empty body line
+        } else {
+          q.deleteText(lineIdx, 1, 'user');                  // just the empty body line
+        }
+        return false;
+      }
+      return true;
+    });
+    // addBinding appends; Quill's default Enter/Backspace handlers would run
+    // first and consume the event. Move ours to the front so they win.
+    ['Enter', 'Backspace'].forEach(function (k) {
+      const arr = q.keyboard.bindings[k];
+      if (arr && arr.length) arr.unshift(arr.pop());
+    });
+
     // Chip click handler — detects which zone was clicked (data-field or data-action)
     q.root.addEventListener('mousedown', (e) => {
+      // Diagnostic header — "Promouvoir en problème" button → emit a window event
+      // that the Sommaire panel listens for (Summary.jsx).
+      const promoteEl = e.target.closest('.ql-diag-promote');
+      if (promoteEl) {
+        e.preventDefault();
+        const hdr = promoteEl.closest('.ql-diag-header');
+        const nmEl = hdr && hdr.querySelector('.ql-diag-name');
+        const nm = nmEl ? nmEl.textContent.trim() : '';
+        if (nm) window.dispatchEvent(new CustomEvent('note:add-problem', { detail: { name: nm } }));
+        promoteEl.classList.add('ql-diag-promoted');
+        return;
+      }
+      // Diagnostic header — click the name to rename it.
+      const diagNameEl = e.target.closest('.ql-diag-name');
+      if (diagNameEl) {
+        e.preventDefault();
+        openDiagRename(diagNameEl);
+        return;
+      }
       const chipEl = e.target.closest('.chip[data-cid]');
       if (chipEl) {
         e.preventDefault();
@@ -423,12 +672,12 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         const s0 = slashStateRef.current;
         if (s0.mode === 'diagnostic') {
           if (e.key === 'Escape') { e.preventDefault(); closeSlashMenu(); return; }
-          if (e.key === 'Enter') { e.preventDefault(); confirmDiagnostic(); return; }
+          if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); confirmDiagnostic(); return; }
           // All other keys (typing, backspace) pass through
         } else {
           const isOrder = s0.mode === 'order';
           const listFor = (query) => isOrder
-            ? flattenRxResults(window.NOTE_DATA.searchOrder(s0.kind, query || ''))
+            ? flattenRxResults(window.NOTE_DATA.searchOrder(s0.kind, (query || '').trim()))
             : filterSlash(query);
           if (e.key === 'Escape') {e.preventDefault();closeSlashMenu();return;}
           if (e.key === 'ArrowDown') {
@@ -782,6 +1031,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     });
     setSlash(null);slashStateRef.current = null;
     setFuncMenu(null);
+    refocusAfterInsert(insertAt + 2);
   }
 
   function filterSlash(q) {
@@ -813,16 +1063,18 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       at = sel ? sel.index : Math.max(0, q.getLength() - 1);
     }
     q.insertEmbed(at, 'orderbadge', { kind }, 'silent');
-    if (carryQuery) q.insertText(at + 1, carryQuery, 'silent');
-    q.setSelection(at + 1 + carryQuery.length, 0, 'silent');
+    // Leading space after the badge = an editable caret anchor (see enterDiagnosticMode).
+    const carry = ' ' + carryQuery;
+    q.insertText(at + 1, carry, 'silent');
+    q.setSelection(at + 1 + carry.length, 0, 'silent');
     silentRef.current = false;
     const stored = deltaToStored(q.getContents());
     lastStoredRef.current = stored;
     onChange(stored);
-    const pos = getBoundsPos(q, at + 1 + carryQuery.length);
-    const ns = { mode: 'order', kind, query: carryQuery, activeIndex: 0, pos, startIndex: at };
+    const pos = getBoundsPos(q, at + 1 + carry.length);
+    const ns = { mode: 'order', kind, query: carry, activeIndex: 0, pos, startIndex: at };
     setSlash(ns); slashStateRef.current = ns;
-    if (carryQuery) paintSlash(at + 1, carryQuery.length);
+    paintSlash(at + 1, carry.length);
     setGhost(null);
     setFuncMenu(null);
   }
@@ -844,38 +1096,118 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       at = sel ? sel.index : Math.max(0, q.getLength() - 1);
     }
     q.insertEmbed(at, 'orderbadge', { kind: 'dx' }, 'silent');
-    if (carryQuery) q.insertText(at + 1, carryQuery, 'silent');
-    q.setSelection(at + 1 + carryQuery.length, 0, 'silent');
+    // Leading space after the badge = an editable caret anchor. Without it, when
+    // the badge is the first thing in the editor the native caret lands ON the
+    // non-editable badge and the user can't type the name (confirmed via debug).
+    const carry = ' ' + carryQuery;
+    q.insertText(at + 1, carry, 'silent');
+    q.setSelection(at + 1 + carry.length, 0, 'silent');
     silentRef.current = false;
     const stored = deltaToStored(q.getContents());
     lastStoredRef.current = stored;
     onChange(stored);
-    const pos = getBoundsPos(q, at + 1 + carryQuery.length);
-    const ns = { mode: 'diagnostic', kind: 'dx', query: carryQuery, activeIndex: 0, pos, startIndex: at };
+    const pos = getBoundsPos(q, at + 1 + carry.length);
+    const ns = { mode: 'diagnostic', kind: 'dx', query: carry, activeIndex: 0, pos, startIndex: at };
     setSlash(ns); slashStateRef.current = ns;
-    if (carryQuery) paintSlash(at + 1, carryQuery.length);
+    paintSlash(at + 1, carry.length);
     setGhost(null);
     setFuncMenu(null);
+  }
+
+  // Shared focus/caret restoration after a slash insertion (chip, order, or
+  // diagnostic). Completing a slash command unmounts its menu and re-renders;
+  // in real browsers that can leave the editor without keyboard focus, or drop
+  // the caret onto the freshly-inserted non-editable embed (a chip or the
+  // diagnostic header) — so the next keystrokes go nowhere until the user clicks.
+  // We re-focus and re-assert the caret on the editable spot, across a few
+  // timing points to survive the React commit. `bodyDiagId`, when given, forces
+  // the native DOM caret inside that diagnostic's body line.
+  function refocusAfterInsert(index, bodyDiagId) {
+    function go() {
+      const qq = quillRef.current; if (!qq) return;
+      qq.focus();
+      try { qq.setSelection(index, 0, 'api'); } catch (e) {}
+      if (bodyDiagId) {
+        const bodyEl = qq.root.querySelector('.ql-diag-line[data-diag-id="' + bodyDiagId + '"]');
+        if (bodyEl) {
+          try {
+            const range = document.createRange();
+            range.setStart(bodyEl, 0);
+            range.collapse(true);
+            const nsel = window.getSelection();
+            nsel.removeAllRanges();
+            nsel.addRange(range);
+          } catch (e) {}
+        }
+      }
+    }
+    go();
+    requestAnimationFrame(go);
+    setTimeout(go, 0);
   }
 
   function confirmDiagnostic() {
     const q = quillRef.current;
     const s = slashStateRef.current;
     if (!q || !s || s.mode !== 'diagnostic') return;
-    const name = (s.query || '').trim();
+    const name = (s.query || '').trim() || 'Diagnostic';
     const bIdx = orderBadgeIndex();
     const at = bIdx >= 0 ? bIdx : s.startIndex;
     const removeLen = (bIdx >= 0 ? 1 : 0) + (s.query || '').length;
     clearSlashPaint();
     silentRef.current = true;
     if (removeLen > 0) q.deleteText(at, removeLen, 'silent');
+    // Insert the diagnostic region in place at the caret: a header block embed
+    // followed by one empty body line. Any text before the caret stays above;
+    // any text after falls below as a normal line (so the caret can leave later).
+    const diagId = newDiagId();
+    const Delta = Quill.import('delta');
+    const lineInfo = q.getLine(at);
+    const off = lineInfo && lineInfo.length > 1 ? lineInfo[1] : 0;
+    const needBreak = off > 0;
+    const d = new Delta().retain(at);
+    if (needBreak) d.insert('\n');                          // close the preceding text line
+    d.insert({ 'diagnostic-header': { id: diagId, name: name } });
+    d.insert('\n', { diagnostic: diagId });                 // empty body line
+    q.updateContents(d, 'silent');
     silentRef.current = false;
+    const caret = at + (needBreak ? 1 : 0) + 1;             // into the empty body line
     const stored = deltaToStored(q.getContents());
     lastStoredRef.current = stored;
     onChange(stored);
     setSlash(null); slashStateRef.current = null;
     setGhost(null);
-    window.dispatchEvent(new CustomEvent('note:add-diagnostic', { detail: { name: name } }));
+    refocusAfterInsert(caret, diagId);
+  }
+
+  // --- Diagnostic rename (click the header name) ---
+  function openDiagRename(nameEl) {
+    const rect = nameEl.getBoundingClientRect();
+    setDiagRename({
+      id: nameEl.getAttribute('data-diag-id'),
+      value: nameEl.textContent || '',
+      pos: { top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 280)) }
+    });
+  }
+  function commitDiagRename(newName) {
+    const q = quillRef.current;
+    const dr = diagRename;
+    setDiagRename(null);
+    if (!q || !dr) return;
+    const name = (newName || '').trim();
+    if (!name || name === dr.value) return;
+    const headerEl = q.root.querySelector('.ql-diag-header[data-diag-id="' + dr.id + '"]');
+    if (!headerEl) return;
+    const blot = Quill.find(headerEl);
+    if (!blot) return;
+    const idx = q.getIndex(blot);
+    silentRef.current = true;
+    q.deleteText(idx, 1, 'silent');
+    q.insertEmbed(idx, 'diagnostic-header', { id: dr.id, name: name }, 'silent');
+    silentRef.current = false;
+    const stored = deltaToStored(q.getContents());
+    lastStoredRef.current = stored;
+    onChange(stored);
   }
 
   function insertOrderChip(item) {
@@ -890,11 +1222,17 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     const bIdx = orderBadgeIndex();
     const at = bIdx >= 0 ? bIdx : s.startIndex;
     const removeLen = (bIdx >= 0 ? 1 : 0) + (s.query || '').length;
+    // Preserve the diagnostic body context so the chip lands inside the box.
+    const preFmt = q.getFormat(at);
+    const diagBodyId = preFmt.diagnostic || null;
     clearSlashPaint();
     silentRef.current = true;
     if (removeLen > 0) q.deleteText(at, removeLen, 'silent');
     q.insertEmbed(at, 'chip', { cid: chipId, type: def.type, label, icon: def.icon, rx, details: item.details || {} }, 'silent');
     q.insertText(at + 1, ' ', 'silent');
+    // If we were inside a diagnostic body, re-assert the line format — Quill's
+    // normalizer can silently drop it after an embed insertion on a block boundary.
+    if (diagBodyId) q.formatLine(at, 1, 'diagnostic', diagBodyId, 'silent');
     q.setSelection(at + 2, 0, 'silent');
     silentRef.current = false;
     const stored = deltaToStored(q.getContents());
@@ -913,6 +1251,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     });
     setSlash(null); slashStateRef.current = null;
     setGhost(null);
+    refocusAfterInsert(at + 2);
   }
 
   function handleFileChange(e) {
@@ -946,7 +1285,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
   const isDiagnosticMode = !!(slash && slash.mode === 'diagnostic');
   const orderKind = isOrderMode ? slash.kind : null;
   const orderDef = orderKind ? window.NOTE_DATA.ORDER_DEFS[orderKind] : null;
-  const orderQuery = isOrderMode ? (slash.query || '') : '';
+  const orderQuery = isOrderMode ? (slash.query || '').trim() : '';
   const orderResults = isOrderMode ? window.NOTE_DATA.searchOrder(orderKind, orderQuery) : null;
   const slashItems = slash && !isOrderMode && !isDiagnosticMode ? filterSlash(slash.query) : [];
 
@@ -1065,9 +1404,16 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       {isDiagnosticMode &&
       <DiagnosticDropdown
         position={{ top: slash.pos.caretBottom + 6, left: Math.max(8, Math.min(slash.pos.caretLeft, window.innerWidth - 320)) }}
-        query={slash.query || ''}
+        query={(slash.query || '').trim()}
         onConfirm={confirmDiagnostic}
         onClose={closeSlashMenu} />
+      }
+      {diagRename &&
+      <DiagRenamePopover
+        pos={diagRename.pos}
+        value={diagRename.value}
+        onCommit={commitDiagRename}
+        onCancel={() => setDiagRename(null)} />
       }
       {slash && isOrderMode &&
       <RxMenu
@@ -1104,6 +1450,41 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         onChange={handleFileChange} />
     </>);
 
+}
+
+// ---------------------------------------------------------
+// DiagRenamePopover — inline editor to rename a diagnostic (click its header name)
+// ---------------------------------------------------------
+function DiagRenamePopover({ pos, value, onCommit, onCancel }) {
+  const [v, setV] = useStateE(value || '');
+  const inputRef = useRefE(null);
+  useEffectE(function() {
+    if (inputRef.current) { inputRef.current.focus(); inputRef.current.select(); }
+  }, []);
+  return (
+    <div style={{
+      position: 'fixed', top: pos.top, left: pos.left, zIndex: 70,
+      background: '#fff', border: '1px solid #b3ccf0', borderRadius: 10,
+      boxShadow: '0 4px 16px rgba(37,36,94,0.16)',
+      display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', minWidth: 240
+    }}>
+      <span className="material-icons-outlined" style={{ fontSize: 16, color: '#1a5fd4', flexShrink: 0 }}>local_hospital</span>
+      <input
+        ref={inputRef}
+        value={v}
+        placeholder="Nom du diagnostic…"
+        style={{
+          flex: 1, border: 'none', borderBottom: '1.5px solid #1a5fd4', outline: 'none',
+          background: 'transparent', font: "500 14px 'Inter',sans-serif", color: 'rgba(0,0,0,0.85)', padding: '2px 2px'
+        }}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); onCommit(v); }
+          else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+        }}
+        onBlur={() => onCommit(v)} />
+    </div>
+  );
 }
 
 // ---------------------------------------------------------

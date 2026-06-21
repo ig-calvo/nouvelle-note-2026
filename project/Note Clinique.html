@@ -198,6 +198,8 @@ function App() {
       details: '',
       conclusion: '',
       files: [],
+      sections: data.sections || [],
+      chips: data.chips || {},
     };
     setCompletedNotes(prev => [newNote, ...prev]);
     setNoteOpen(false);
@@ -290,5 +292,6 @@ function App() {
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
+
 </body>
 </html>

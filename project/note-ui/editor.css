@@ -86,6 +86,91 @@
 .note-field .ql-editor .orderbadge--lab .orderbadge-glyph { color: #1975d1; }
 .note-field .ql-editor .orderbadge--img .orderbadge-glyph { color: #7a3ec2; }
 
+/* ============================================================
+   Diagnostic region — inline Notion-callout block inside a section.
+   Header (BlockEmbed) sits flush above the body lines (plain blocks);
+   consecutive same-region lines are grouped into one rounded box via
+   CSS adjacency (no wrapping container, so typing stays reliable).
+   ============================================================ */
+.note-field .ql-editor .ql-diag-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #e8f0fb;
+  border: 1px solid #b3ccf0;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  padding: 7px 10px;
+  margin: 10px 0 0;
+  user-select: none;
+}
+.note-field .ql-editor .ql-diag-header .ql-diag-ic {
+  font-size: 18px !important;
+  color: #1a5fd4;
+  flex-shrink: 0;
+}
+.note-field .ql-editor .ql-diag-header .ql-diag-name {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 15px;
+  color: #1a5fd4;
+  cursor: text;
+  border-radius: 4px;
+  padding: 1px 4px;
+  transition: background 120ms;
+}
+.note-field .ql-editor .ql-diag-header .ql-diag-name:hover {
+  background: rgba(26,95,212,0.1);
+}
+.note-field .ql-editor .ql-diag-header .ql-diag-promote {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #b3ccf0;
+  background: #fff;
+  color: #1a5fd4;
+  border-radius: 16px;
+  padding: 3px 10px 3px 7px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+.note-field .ql-editor .ql-diag-header .ql-diag-promote:hover {
+  background: #e8f0fb;
+  border-color: #1a5fd4;
+}
+.note-field .ql-editor .ql-diag-header .ql-diag-promote.ql-diag-promoted {
+  background: #e7f5ea;
+  border-color: #2e7d32;
+  color: #2e7d32;
+}
+.note-field .ql-editor .ql-diag-header .ql-diag-promote .material-symbols-outlined {
+  font-size: 15px !important;
+}
+/* Body lines: blue-tint background with side borders; consecutive lines
+   stack seamlessly under the header to form one box. */
+.note-field .ql-editor .ql-diag-line {
+  background: #f5f9ff;
+  border-left: 1px solid #b3ccf0;
+  border-right: 1px solid #b3ccf0;
+  padding: 1px 12px;
+  margin: 0 !important;
+}
+/* First body line (right after the header): a little top padding. */
+.note-field .ql-editor .ql-diag-header + .ql-diag-line {
+  padding-top: 5px;
+}
+/* Last body line of a region (not followed by another body line): close the box. */
+.note-field .ql-editor .ql-diag-line:not(:has(+ .ql-diag-line)) {
+  border-bottom: 1px solid #b3ccf0;
+  border-radius: 0 0 10px 10px;
+  padding-bottom: 5px;
+  margin-bottom: 10px !important;
+}
+
 /* Inline hint shown right after a bare "/" prompting the user to type */
 .slash-hint {
   font-family: var(--font-body);

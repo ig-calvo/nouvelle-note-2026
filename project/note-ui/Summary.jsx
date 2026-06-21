@@ -96,6 +96,24 @@ function Summary() {
     });
   }
 
+  // A diagnostic promoted from a clinical note ("Promouvoir en problème") is
+  // added to the Problèmes list. Dispatched as a window event by the editor.
+  React.useEffect(function() {
+    function onAddProblem(e) {
+      var name = ((e.detail && e.detail.name) || '').trim();
+      if (!name) return;
+      setData(function(prev) {
+        var arr = (prev.problems || []).slice();
+        var exists = arr.some(function(p) { return (p.name || p.left) === name; });
+        if (exists) return prev;
+        arr.push({ left: name, name: name, right: '' });
+        return Object.assign({}, prev, { problems: arr });
+      });
+    }
+    window.addEventListener('note:add-problem', onAddProblem);
+    return function() { window.removeEventListener('note:add-problem', onAddProblem); };
+  }, []);
+
   // Drag-to-reorder
   function onDragStart(e, idx) { setDragSrc(idx); e.dataTransfer.effectAllowed = 'move'; }
   function onDragOver(e, idx) {
