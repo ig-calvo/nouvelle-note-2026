@@ -45,8 +45,12 @@ function ClinicalToolPicker({ anchorRect, onClose, onSelect }) {
       if (panelRef.current && !panelRef.current.contains(e.target)) onClose();
     }
     window.addEventListener('keydown', onKey);
-    document.addEventListener('mousedown', onDoc);
+    // Defer the close-outside listener by a tick: the menu item that opens this
+    // picker fires on mousedown, and React mounts us mid-propagation — attaching
+    // synchronously would let that same mousedown immediately close the picker.
+    const t = setTimeout(function () { document.addEventListener('mousedown', onDoc); }, 0);
     return function () {
+      clearTimeout(t);
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('mousedown', onDoc);
     };
