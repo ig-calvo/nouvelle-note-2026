@@ -132,23 +132,35 @@
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
 <script>fetch('note-ui/cim10-fr-clinique.json').then(function(r){return r.json();}).then(function(d){window.CIM10_DATA=d;});</script>
-<script type="text/babel" src="tweaks-panel.jsx"></script>
-<script type="text/babel" src="note-ui/TopBar.jsx"></script>
-<script type="text/babel" src="note-ui/SideNav.jsx"></script>
-<script type="text/babel" src="note-ui/PatientBanner.jsx"></script>
-<script type="text/babel" src="note-ui/editor-data.jsx"></script>
-<script type="text/babel" src="note-ui/editor-popover.jsx"></script>
-<script type="text/babel" src="note-ui/editor-field.jsx"></script>
-<script type="text/babel" src="note-ui/AIBox.jsx"></script>
-<script type="text/babel" src="note-ui/ClinicalTool.jsx"></script>
-<script type="text/babel" src="note-ui/ClinicalToolPicker.jsx"></script>
-<script type="text/babel" src="note-ui/NoteEditor.jsx"></script>
-<script type="text/babel" src="note-ui/NoteStartCards.jsx"></script>
-<script type="text/babel" src="note-ui/SmartNoteModal.jsx"></script>
-<script type="text/babel" src="note-ui/NotesList.jsx"></script>
-<script type="text/babel" src="note-ui/FloatingToolbar.jsx"></script>
-<script type="text/babel" src="note-ui/SummaryModals.jsx"></script>
-<script type="text/babel" src="note-ui/Summary.jsx"></script>
+<!-- Chargeur JSX avec anti-cache : ajoute un horodatage à chaque rechargement
+     pour qu'on voie toujours la dernière version du code pendant le prototypage. -->
+<script>
+(function () {
+  var srcs = [
+    'tweaks-panel.jsx',
+    'note-ui/TopBar.jsx',
+    'note-ui/SideNav.jsx',
+    'note-ui/PatientBanner.jsx',
+    'note-ui/editor-data.jsx',
+    'note-ui/editor-popover.jsx',
+    'note-ui/editor-field.jsx',
+    'note-ui/AIBox.jsx',
+    'note-ui/ClinicalTool.jsx',
+    'note-ui/ClinicalToolPicker.jsx',
+    'note-ui/NoteEditor.jsx',
+    'note-ui/NoteStartCards.jsx',
+    'note-ui/SmartNoteModal.jsx',
+    'note-ui/NotesList.jsx',
+    'note-ui/FloatingToolbar.jsx',
+    'note-ui/SummaryModals.jsx',
+    'note-ui/Summary.jsx'
+  ];
+  var bust = '?v=' + Date.now();
+  for (var i = 0; i < srcs.length; i++) {
+    document.write('<script type="text/babel" src="' + srcs[i] + bust + '"><\/script>');
+  }
+})();
+</script>
 
 <script type="text/babel">
 

@@ -1450,7 +1450,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         position={{ top: funcMenu.top, left: funcMenu.left }}
         query=""
         items={filterSlash('')}
-        activeIndex={-1}
+        activeIndex={0}
         onSelect={(it) => { setFuncMenu(null); chooseSlashItem(it); }}
         onClose={() => setFuncMenu(null)} />
       }
