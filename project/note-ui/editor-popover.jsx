@@ -182,15 +182,19 @@ function SlashMenu({ position, query, onSelect, onClose, activeIndex, items }) {
 }
 
 // Functions / "Ajouter" menu — opened from the + button
-function AddMenu({ position, orders, onPickOrder, onPickFile, onAddSection, onClose }) {
+function AddMenu({ position, tools, orders, onPickTool, onPickOrder, onPickFile, onAddSection, onClose }) {
   const stop = (e) => e.stopPropagation();
   const [showFileSub, setShowFileSub] = useStateP(false);
+
+  const instructionsItem = (tools || []).find(function(t) { return t.key === 'instructions'; });
+  const diagnosticItem = (tools || []).find(function(t) { return t.key === 'diagnostic'; });
 
   return (
     <>
       <div className="addmenu-scrim" onMouseDown={(e) => { e.preventDefault(); onClose(); }} />
       <div className="addmenu" style={position} onMouseDown={stop}>
-        <div className="addmenu-sec">Rédaction</div>
+
+        <div className="addmenu-sec">Ajouter</div>
         <button className="addmenu-item" style={showFileSub ? { background: '#f5f5fa' } : {}}
           onMouseDown={(e) => { e.preventDefault(); setShowFileSub(s => !s); }}>
           <span className="material-icons-outlined ic">upload_file</span>
@@ -215,20 +219,34 @@ function AddMenu({ position, orders, onPickOrder, onPickFile, onAddSection, onCl
             </button>
           </div>
         )}
-        <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); }}>
-          <span className="material-icons-outlined ic">bolt</span>
-          <span className="lbl">Textes rapides</span>
-          <span className="kbd">Ctrl+R</span>
-        </button>
         <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); if (onAddSection) onAddSection(); onClose(); }}>
           <span className="material-icons-outlined ic">add</span>
           <span className="lbl">Ajouter une section</span>
           <span className="kbd">/sec</span>
         </button>
+        {instructionsItem && (
+          <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); if (onPickTool) onPickTool(instructionsItem); onClose(); }}>
+            <span className="material-symbols-outlined ic">{instructionsItem.icon}</span>
+            <span className="lbl">Instructions patient</span>
+            <span className="kbd">/{instructionsItem.kbd}</span>
+          </button>
+        )}
 
         <div className="addmenu-div" />
 
-        <div className="addmenu-sec">Fonctions</div>
+        <div className="addmenu-sec">Outils</div>
+        <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); }}>
+          <span className="material-icons-outlined ic">bolt</span>
+          <span className="lbl">Textes rapides</span>
+          <span className="kbd">Ctrl+R</span>
+        </button>
+        {diagnosticItem && (
+          <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); if (onPickTool) onPickTool(diagnosticItem); onClose(); }}>
+            <span className="material-symbols-outlined ic">{diagnosticItem.icon}</span>
+            <span className="lbl">Diagnostic</span>
+            <span className="kbd">/{diagnosticItem.kbd}</span>
+          </button>
+        )}
         {(orders || []).map((it) => (
           <button key={it.key} className="addmenu-item"
             onMouseDown={(e) => { e.preventDefault(); if (onPickOrder) onPickOrder(it.kbd); onClose(); }}>
@@ -246,10 +264,6 @@ function AddMenu({ position, orders, onPickOrder, onPickFile, onAddSection, onCl
           <span className="material-icons-outlined ic">handyman</span>
           <span className="lbl">Outils cliniques</span>
           <span className="material-icons-outlined arr">chevron_right</span>
-        </button>
-        <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); }}>
-          <span className="material-icons-outlined ic">lock</span>
-          <span className="lbl">Note confidentielle</span>
         </button>
       </div>
     </>

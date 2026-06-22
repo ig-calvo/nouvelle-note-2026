@@ -1,14 +1,27 @@
 /* global React */
 function PatientBanner({ forceCollapsed }) {
   const [phase, setPhase] = React.useState('expanded');
+  const phaseRef = React.useRef(phase);
+  phaseRef.current = phase;
 
   React.useEffect(() => {
     if (forceCollapsed && phase === 'expanded') setPhase('collapsed');
   }, [forceCollapsed]);
 
+  React.useEffect(() => {
+    function onScroll() {
+      if (window.scrollY > 100 && phaseRef.current === 'expanded') setPhase('collapsed');
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const stickyWrap = { position: 'sticky', top: 8, zIndex: 20, marginBottom: 12 };
+
   /* ── Collapsed row ── */
   if (phase === 'collapsed') {
     return (
+      <div style={stickyWrap}>
       <div className="banner-collapse" style={pbStyles.collapsedCard}>
         <div style={pbStyles.collapsedLeft}>
           <span style={pbStyles.avatarSm}>
@@ -55,11 +68,13 @@ function PatientBanner({ forceCollapsed }) {
           </button>
         </div>
       </div>
+      </div>
     );
   }
 
   /* ── Expanded card ── */
   return (
+    <div style={stickyWrap}>
     <div style={pbStyles.card}>
       {/* Identity */}
       <div style={pbStyles.identCol}>
@@ -140,6 +155,7 @@ function PatientBanner({ forceCollapsed }) {
         <span className="material-icons" style={{ fontSize: 20, color: "#39ab49" }}>thumb_up</span>
         <span style={pbStyles.consentText}>Consentement valide</span>
       </div>
+    </div>
     </div>
   );
 }

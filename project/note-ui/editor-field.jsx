@@ -260,19 +260,6 @@ function newDiagId() {return 'd' + _diagSeq++;}
       nm.setAttribute('data-diag-id', value.id || '');
       nm.textContent = value.name || 'Diagnostic';
       node.appendChild(nm);
-      const btn = document.createElement('button');
-      btn.className = 'ql-diag-promote';
-      btn.setAttribute('data-diag-id', value.id || '');
-      btn.setAttribute('type', 'button');
-      btn.setAttribute('title', 'Promouvoir en problème au sommaire');
-      const bic = document.createElement('span');
-      bic.className = 'material-symbols-outlined';
-      bic.textContent = 'flag';
-      btn.appendChild(bic);
-      const blbl = document.createElement('span');
-      blbl.textContent = 'Promouvoir';
-      btn.appendChild(blbl);
-      node.appendChild(btn);
       return node;
     }
     static value(node) {
@@ -672,7 +659,30 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         const s0 = slashStateRef.current;
         if (s0.mode === 'diagnostic') {
           if (e.key === 'Escape') { e.preventDefault(); closeSlashMenu(); return; }
-          if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); confirmDiagnostic(); return; }
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const suggs = searchCIM10(s0.query || '');
+            if (suggs.length > 0) {
+              setSlash((s) => { const ns = { ...s, activeIndex: Math.min(suggs.length - 1, (s.activeIndex >= 0 ? s.activeIndex : -1) + 1) }; slashStateRef.current = ns; return ns; });
+            }
+            return;
+          }
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSlash((s) => { const ns = { ...s, activeIndex: Math.max(-1, (s.activeIndex >= 0 ? s.activeIndex : 0) - 1) }; slashStateRef.current = ns; return ns; });
+            return;
+          }
+          if (e.key === 'Enter') {
+            e.preventDefault(); e.stopPropagation();
+            const suggs = searchCIM10(s0.query || '');
+            const ai = s0.activeIndex;
+            if (suggs.length > 0 && ai >= 0 && ai < suggs.length) {
+              confirmDiagnostic(suggs[ai].libelle);
+            } else {
+              confirmDiagnostic();
+            }
+            return;
+          }
           // All other keys (typing, backspace) pass through
         } else {
           const isOrder = s0.mode === 'order';
@@ -1146,11 +1156,11 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     setTimeout(go, 0);
   }
 
-  function confirmDiagnostic() {
+  function confirmDiagnostic(nameOverride) {
     const q = quillRef.current;
     const s = slashStateRef.current;
     if (!q || !s || s.mode !== 'diagnostic') return;
-    const name = (s.query || '').trim() || 'Diagnostic';
+    const name = (nameOverride || s.query || '').trim() || 'Diagnostic';
     const bIdx = orderBadgeIndex();
     const at = bIdx >= 0 ? bIdx : s.startIndex;
     const removeLen = (bIdx >= 0 ? 1 : 0) + (s.query || '').length;
@@ -1403,8 +1413,11 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       }
       {isDiagnosticMode &&
       <DiagnosticDropdown
-        position={{ top: slash.pos.caretBottom + 6, left: Math.max(8, Math.min(slash.pos.caretLeft, window.innerWidth - 320)) }}
+        position={{ top: slash.pos.caretBottom + 6, left: Math.max(8, Math.min(slash.pos.caretLeft, window.innerWidth - 380)) }}
         query={(slash.query || '').trim()}
+        suggestions={searchCIM10((slash.query || '').trim())}
+        activeIndex={slash.activeIndex != null ? slash.activeIndex : -1}
+        onPickSuggestion={(name) => confirmDiagnostic(name)}
         onConfirm={confirmDiagnostic}
         onClose={closeSlashMenu} />
       }
@@ -1488,31 +1501,70 @@ function DiagRenamePopover({ pos, value, onCommit, onCancel }) {
 }
 
 // ---------------------------------------------------------
+// searchCIM10 — filter CIM-10 entries by query (accent-insensitive)
+// ---------------------------------------------------------
+function searchCIM10(query) {
+  const data = window.CIM10_DATA;
+  if (!data || !query || query.trim().length < 2) return [];
+  const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const q = norm(query.trim());
+  const results = [];
+  for (let i = 0; i < data.length && results.length < 8; i++) {
+    if (norm(data[i].libelle).includes(q)) results.push(data[i]);
+  }
+  return results;
+}
+
+// ---------------------------------------------------------
 // DiagnosticDropdown — shown while the user types a name after /dx
 // ---------------------------------------------------------
-function DiagnosticDropdown({ position, query, onConfirm, onClose }) {
+function DiagnosticDropdown({ position, query, suggestions, activeIndex, onPickSuggestion, onConfirm, onClose }) {
   return (
     <div style={{
       position: 'fixed', top: position.top, left: position.left,
       background: '#fff', border: '1px solid #b3ccf0', borderRadius: 10,
       boxShadow: '0 4px 16px rgba(37,36,94,0.16)',
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '10px 16px', zIndex: 60, minWidth: 280
+      zIndex: 60, minWidth: 320, maxWidth: 420,
+      fontFamily: "'Inter',sans-serif", overflow: 'hidden'
     }}>
-      <span className="material-icons-outlined" style={{ fontSize: 18, color: '#1a5fd4', flexShrink: 0 }}>local_hospital</span>
-      {query
-        ? <span style={{ font: "400 14px 'Inter',sans-serif", color: 'rgba(0,0,0,0.75)' }}>
-            Diagnostic : <strong>{query}</strong>
-          </span>
-        : <span style={{ font: "400 14px 'Inter',sans-serif", color: 'rgba(0,0,0,0.45)' }}>
-            Saisissez le nom du diagnostic…
-          </span>
-      }
-      {query && (
-        <kbd style={{
-          marginLeft: 'auto', background: '#f0f0f8', border: '1px solid #d0d0e0',
-          borderRadius: 4, padding: '2px 7px', font: "500 12px 'Inter',sans-serif", color: '#555', flexShrink: 0
-        }}>↵</kbd>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px' }}>
+        <span className="material-icons-outlined" style={{ fontSize: 18, color: '#1a5fd4', flexShrink: 0 }}>local_hospital</span>
+        {query
+          ? <span style={{ font: "400 14px 'Inter',sans-serif", color: 'rgba(0,0,0,0.75)', flex: 1 }}>
+              Diagnostic : <strong>{query}</strong>
+            </span>
+          : <span style={{ font: "400 14px 'Inter',sans-serif", color: 'rgba(0,0,0,0.45)', flex: 1 }}>
+              Saisissez le nom du diagnostic…
+            </span>
+        }
+        {query && (
+          <kbd style={{
+            marginLeft: 'auto', background: '#f0f0f8', border: '1px solid #d0d0e0',
+            borderRadius: 4, padding: '2px 7px', font: "500 12px 'Inter',sans-serif", color: '#555', flexShrink: 0
+          }}>↵</kbd>
+        )}
+      </div>
+      {suggestions && suggestions.length > 0 && (
+        <>
+          <div style={{ height: 1, background: '#e8ecf5', margin: '0 12px' }} />
+          <div style={{ padding: '4px 0 6px' }}>
+            {suggestions.map((s, i) => (
+              <div
+                key={s.code}
+                onMouseDown={(e) => { e.preventDefault(); if (onPickSuggestion) onPickSuggestion(s.libelle); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '6px 16px', cursor: 'pointer',
+                  background: i === activeIndex ? '#eef3fb' : 'transparent'
+                }}
+              >
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#1a5fd4', minWidth: 44, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{s.code}</span>
+                <span style={{ fontSize: 13, color: 'rgba(0,0,0,0.82)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.libelle}</span>
+                {i === activeIndex && <kbd style={{ background: '#f0f0f8', border: '1px solid #d0d0e0', borderRadius: 3, padding: '1px 5px', fontSize: 11, color: '#888', flexShrink: 0 }}>↵</kbd>}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
