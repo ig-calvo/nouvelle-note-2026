@@ -68,7 +68,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
 
   React.useEffect(function() {
     function onPickerOpen(e) {
-      setPickerAnchor(e.detail.rect);
+      setPickerAnchor((e.detail && e.detail.rect) || null);
       setPickerOpen(true);
     }
     window.addEventListener('ct-picker-open', onPickerOpen);

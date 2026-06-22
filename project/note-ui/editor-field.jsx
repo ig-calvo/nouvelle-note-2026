@@ -998,7 +998,13 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     const q = quillRef.current;if (!q) return;
     if (it.fileAction) { setFuncMenu(null); setSlash(null); slashStateRef.current = null; if (fileInputRef.current) fileInputRef.current.click(); return; }
     if (it.textRapides) { setFuncMenu(null); setSlash(null); slashStateRef.current = null; return; }
-    if (it.ctPicker) { setFuncMenu(null); setSlash(null); slashStateRef.current = null; window.dispatchEvent(new CustomEvent('ct-picker-open', {})); return; }
+    if (it.ctPicker) {
+      const btn = addBtnRef.current;
+      const rect = btn ? btn.getBoundingClientRect() : { left: 16, top: 72, bottom: 96 };
+      setFuncMenu(null); setSlash(null); slashStateRef.current = null;
+      window.dispatchEvent(new CustomEvent('ct-picker-open', { detail: { rect } }));
+      return;
+    }
     if (it.rxSearch || it.orderSearch) { enterOrderMode(it.kbd || 'rx'); return; }
     if (it.diagnosticEntry) { enterDiagnosticMode(''); return; }
     if (it.addSection) {

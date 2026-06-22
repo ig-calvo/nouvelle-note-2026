@@ -69,19 +69,30 @@ function ClinicalToolPicker({ anchorRect, onClose, onSelect }) {
   const filtered = CLINICAL_TOOLS.filter(function (t) { return !q || t.label.toLowerCase().includes(q); });
   const displayed = tab === 'favori' ? filtered.filter(function (t) { return favorites.includes(t.id); }) : filtered;
 
-  // Panel position: below anchor, flush left, clamped to viewport
+  // Panel position: below anchor (or flipped above), clamped to viewport.
+  // Same 70vh cap as the slash / add menu, but the height is also bounded by
+  // the space actually available so the list never overflows the screen.
   const panelW = 480;
-  var left = 0, top = 0;
+  const MARGIN = 16;
+  const VH_CAP = Math.round(window.innerHeight * 0.7);
+  var left = MARGIN, top = 80, maxH = VH_CAP;
   if (anchorRect) {
-    left = Math.min(anchorRect.left, window.innerWidth - panelW - 16);
-    left = Math.max(left, 16);
-    top = anchorRect.bottom + 6;
+    left = Math.max(MARGIN, Math.min(anchorRect.left, window.innerWidth - panelW - MARGIN));
+    const spaceBelow = window.innerHeight - anchorRect.bottom - MARGIN;
+    const spaceAbove = anchorRect.top - MARGIN;
+    if (spaceBelow >= 280 || spaceBelow >= spaceAbove) {
+      top = anchorRect.bottom + 6;
+      maxH = Math.min(VH_CAP, spaceBelow);
+    } else {
+      maxH = Math.min(VH_CAP, spaceAbove);
+      top = Math.max(MARGIN, anchorRect.top - 6 - maxH);
+    }
   }
 
   return (
     <div
       ref={panelRef}
-      style={Object.assign({}, ctpS.panel, { left: left, top: top })}>
+      style={Object.assign({}, ctpS.panel, { left: left, top: top, maxHeight: maxH })}>
 
       {/* Header */}
       <div style={ctpS.header}>
@@ -177,7 +188,6 @@ const ctpS = {
     position: 'fixed',
     zIndex: 3000,
     width: 480,
-    maxHeight: '66vh',
     background: '#fff',
     border: '1px solid #ececf2',
     borderRadius: 12,
