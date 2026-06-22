@@ -1304,7 +1304,6 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
 
   // Open the functions menu (Prescription, Labo, Imagerie…) from the + button
   function openFunctionsMenu() {
-    const q = quillRef.current; if (q) q.focus();
     const btn = addBtnRef.current;
     if (!btn) return;
     const r = btn.getBoundingClientRect();
