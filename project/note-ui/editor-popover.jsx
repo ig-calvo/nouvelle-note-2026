@@ -171,7 +171,10 @@ function SlashMenu({ position, query, onSelect, onClose, activeIndex, items }) {
                   <div className="ttl">{it.title}</div>
                   <div className="desc">{it.desc}</div>
                 </div>
-                <span className="kbd">/{it.kbd}</span>
+                {it.ctPicker
+                  ? <span className="material-icons-outlined" style={{fontSize:16,color:'rgba(0,0,0,0.35)',marginLeft:'auto'}}>chevron_right</span>
+                  : !it.noKbd && <span className="kbd">{it.kbdNoSlash ? it.kbd : '/' + it.kbd}</span>
+                }
               </div>
             );
           })}

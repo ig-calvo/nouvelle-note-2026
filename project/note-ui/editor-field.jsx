@@ -996,6 +996,9 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
 
   function chooseSlashItem(it) {
     const q = quillRef.current;if (!q) return;
+    if (it.fileAction) { setFuncMenu(null); setSlash(null); slashStateRef.current = null; if (fileInputRef.current) fileInputRef.current.click(); return; }
+    if (it.textRapides) { setFuncMenu(null); setSlash(null); slashStateRef.current = null; return; }
+    if (it.ctPicker) { setFuncMenu(null); setSlash(null); slashStateRef.current = null; window.dispatchEvent(new CustomEvent('ct-picker-open', {})); return; }
     if (it.rxSearch || it.orderSearch) { enterOrderMode(it.kbd || 'rx'); return; }
     if (it.diagnosticEntry) { enterDiagnosticMode(''); return; }
     if (it.addSection) {
@@ -1046,8 +1049,8 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
 
   function filterSlash(q) {
     const t = (q || '').toLowerCase().trim();
-    if (!t) return window.NOTE_DATA.SLASH_ITEMS;
-    return window.NOTE_DATA.SLASH_ITEMS.filter((it) => it.title.toLowerCase().includes(t) || it.kbd.includes(t));
+    if (!t) return window.NOTE_DATA.SLASH_ITEMS.filter((it) => !it.hideWhenEmpty);
+    return window.NOTE_DATA.SLASH_ITEMS.filter((it) => it.title.toLowerCase().includes(t) || (it.kbd && it.kbd.includes(t)));
   }
 
   // ---------------------------------------------------------
@@ -1443,16 +1446,16 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
 
       }
       {funcMenu &&
-      <AddMenu
-        position={{ top: funcMenu.top, left: funcMenu.left }}
-        tools={window.NOTE_DATA.SLASH_ITEMS.filter((t2) => !t2.rxSearch && !t2.orderSearch)}
-        orders={window.NOTE_DATA.SLASH_ITEMS.filter((t2) => t2.rxSearch || t2.orderSearch)}
-        onPickTool={chooseSlashItem}
-        onPickOrder={(kbd) => enterOrderMode(kbd)}
-        onPickFile={() => { fileInputRef.current && fileInputRef.current.click(); }}
-        onAddSection={() => onAddSectionRef.current && onAddSectionRef.current(id)}
-        onClose={() => setFuncMenu(null)} />
-
+      <>
+        <div className="addmenu-scrim" onMouseDown={(e) => { e.preventDefault(); setFuncMenu(null); }} />
+        <SlashMenu
+          position={{ top: funcMenu.top, left: funcMenu.left }}
+          query=""
+          items={filterSlash('')}
+          activeIndex={-1}
+          onSelect={(it) => { setFuncMenu(null); chooseSlashItem(it); }}
+          onClose={() => setFuncMenu(null)} />
+      </>
       }
       <input
         ref={fileInputRef}
