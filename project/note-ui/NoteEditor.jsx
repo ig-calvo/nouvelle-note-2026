@@ -78,15 +78,27 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
   // Dispatch chip counts whenever chips or sections change (drives footer counters).
   // Diagnostics are counted from the {{DIAG:..}} region markers in section content.
   React.useEffect(function() {
+    // Ne compter que les chips RÉELLEMENT présents dans le contenu : la map
+    // `chips` conserve les chips supprimés de l'éditeur (orphelins), donc on
+    // scanne les marqueurs {{CHIP:id}} de toutes les zones éditables.
+    var blob = sections.map(function(s) { return s.content || ''; }).join('\n');
+    Object.keys(sectionSplits).forEach(function(k) {
+      var sp = sectionSplits[k] || {};
+      blob += '\n' + (sp.top || '') + '\n' + (sp.bot || '');
+    });
+    var present = {};
+    var re = /\{\{CHIP:([^}]+)\}\}/g, m;
+    while ((m = re.exec(blob))) present[m[1]] = true;
     var counts = {};
-    Object.values(chips).forEach(function(c) {
-      var t = c.entity && c.entity.type;
+    Object.keys(present).forEach(function(id) {
+      var c = chips[id];
+      var t = c && c.entity && c.entity.type;
       if (t) counts[t] = (counts[t] || 0) + 1;
     });
     var dxCount = scanDiagNames(sections).length;
     if (dxCount) counts.diagnostic = dxCount;
     window.dispatchEvent(new CustomEvent('note:chips-change', { detail: counts }));
-  }, [chips, sections]);
+  }, [chips, sections, sectionSplits]);
 
   // ----- section content helpers -----
   function setSectionContent(sectionId, valOrFn) {
