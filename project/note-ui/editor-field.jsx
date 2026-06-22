@@ -80,16 +80,22 @@ function newDiagId() {return 'd' + _diagSeq++;}
             freq.setAttribute('data-field', 'frequency');
             freq.textContent = d.frequency;
             node.appendChild(freq);
-            const durParts = [];
-            if (d.duration && d.duration !== '—') durParts.push('× ' + d.duration + ' ' + (d.durationUnit || 'jours'));
-            if (d.refills !== undefined && String(d.refills) !== '' && String(d.refills) !== '0') durParts.push('R' + d.refills);
-            if (durParts.length) {
+            // Durée et renouvellement : deux badges distincts, chacun éditable.
+            if (d.duration && d.duration !== '—') {
               const sep2 = document.createElement('span'); sep2.className = 'chip-rx-sep'; sep2.textContent = ' '; node.appendChild(sep2);
               const dur = document.createElement('span');
               dur.className = 'chip-rx-dur';
-              dur.setAttribute('data-field', 'duration_refills');
-              dur.textContent = durParts.join(' ');
+              dur.setAttribute('data-field', 'duration');
+              dur.textContent = '× ' + d.duration + ' ' + (d.durationUnit || 'jours');
               node.appendChild(dur);
+            }
+            if (d.refills !== undefined && String(d.refills) !== '' && String(d.refills) !== '0') {
+              const sep3 = document.createElement('span'); sep3.className = 'chip-rx-sep'; sep3.textContent = ' '; node.appendChild(sep3);
+              const ref = document.createElement('span');
+              ref.className = 'chip-rx-dur';
+              ref.setAttribute('data-field', 'refills');
+              ref.textContent = 'R' + d.refills;
+              node.appendChild(ref);
             }
           } else {
             const sg = document.createElement('span');
@@ -448,7 +454,7 @@ function MedHighlight({ name, query }) {
 
 // Flatten /rx search results into one keyboard-navigable list
 function flattenRxResults(r) {
-  return r.favoris.concat(r.frequents, r.autres);
+  return (r.profil || []).concat(r.favoris, r.frequents, r.autres);
 }
 
 // ---------------------------------------------------------
@@ -787,13 +793,15 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
           if (rtEl && d.route !== undefined && rtEl.textContent !== d.route) rtEl.textContent = d.route || '';
           const freqEl = node.querySelector('.chip-rx-freq');
           if (freqEl && d.frequency && freqEl.textContent !== d.frequency) freqEl.textContent = d.frequency;
-          const durEl = node.querySelector('.chip-rx-dur');
+          const durEl = node.querySelector('[data-field="duration"]');
           if (durEl) {
-            const dp = [];
-            if (d.duration && d.duration !== '—') dp.push('× ' + d.duration + ' ' + (d.durationUnit || 'jours'));
-            if (d.refills !== undefined && String(d.refills) !== '' && String(d.refills) !== '0') dp.push('R' + d.refills);
-            const ndt = dp.join(' ');
-            if (durEl.textContent !== ndt) durEl.textContent = ndt;
+            const t = (d.duration && d.duration !== '—') ? '× ' + d.duration + ' ' + (d.durationUnit || 'jours') : '';
+            if (durEl.textContent !== t) durEl.textContent = t;
+          }
+          const refEl = node.querySelector('[data-field="refills"]');
+          if (refEl) {
+            const t = (d.refills !== undefined && String(d.refills) !== '' && String(d.refills) !== '0') ? 'R' + d.refills : '';
+            if (refEl.textContent !== t) refEl.textContent = t;
           }
           // Update fallback sig
           const sg = node.querySelector('.chip-rx-sig');

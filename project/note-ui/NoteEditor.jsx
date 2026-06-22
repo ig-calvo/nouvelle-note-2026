@@ -206,6 +206,15 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
           var drm = /^(\d+)\s*(jours?|semaines?|mois)(?:\s+R(\d+))?$/i.exec(val.trim());
           if (drm) { details.duration = drm[1]; details.durationUnit = drm[2]; if (drm[3] !== undefined) details.refills = drm[3]; }
           else if (/^long terme/i.test(val)) { details.duration = ''; details.durationUnit = ''; var rm = val.match(/R(\d+)/i); if (rm) details.refills = rm[1]; }
+        } else if (field === 'duration') {
+          if (/^long terme/i.test(val)) { details.duration = ''; details.durationUnit = ''; }
+          else {
+            var dm2 = /^(\d+)\s*(jours?|semaines?|mois|an|ans|année?s?)?/i.exec(val.trim());
+            if (dm2) { details.duration = dm2[1]; if (dm2[2]) details.durationUnit = /an|ann/i.test(dm2[2]) ? 'mois' : dm2[2].replace(/s$/, '') + (/jour|semaine/i.test(dm2[2]) ? 's' : ''); }
+          }
+        } else if (field === 'refills') {
+          var rfm = /R?\s*(\d+)/i.exec(val.trim());
+          details.refills = rfm ? rfm[1] : '0';
         }
       } else if (type === 'lab' || type === 'imaging' || type === 'referral') {
         if (field === 'priority') {
@@ -805,6 +814,10 @@ function ChipInlineEditor({ chipId, field, fieldRect, chips, onSave, onClose }) 
     if (details.duration) dp0.push(details.duration + ' ' + (details.durationUnit || 'jours'));
     if (details.refills) dp0.push('R' + details.refills);
     initialVal = dp0.join(' ');
+  } else if (field === 'duration') {
+    initialVal = details.duration ? (details.duration + ' ' + (details.durationUnit || 'jours')) : '';
+  } else if (field === 'refills') {
+    initialVal = 'R' + (details.refills != null ? details.refills : '0');
   } else if (field === 'priority') {
     initialVal = details.priority || 'Routine';
   } else if (field === 'exam') {
@@ -856,6 +869,13 @@ function ChipInlineEditor({ chipId, field, fieldRect, chips, onSave, onClose }) 
       '6 mois R1', '1 an R0',
       'Long terme R0', 'Long terme R3', 'Long terme R11'
     ],
+    duration: [
+      '3 jours', '5 jours', '7 jours', '10 jours', '14 jours', '21 jours', '28 jours',
+      '30 jours', '60 jours', '90 jours', '6 mois', '1 an', 'Long terme'
+    ],
+    refills: [
+      'R0', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R11', 'R12'
+    ],
     priority: [
       'Routine', 'Prioritaire', 'Semi-urgent', 'Urgent', 'STAT'
     ],
@@ -879,6 +899,7 @@ function ChipInlineEditor({ chipId, field, fieldRect, chips, onSave, onClose }) 
   };
   var FIELD_LABELS = {
     dose: 'Dose', frequency: 'Fréquence', form: 'Forme', route: 'Voie', duration_refills: 'Durée / Renouvellements',
+    duration: 'Durée', refills: 'Renouvellement',
     priority: 'Priorité', exam: 'Examen', specialty: 'Spécialité'
   };
 

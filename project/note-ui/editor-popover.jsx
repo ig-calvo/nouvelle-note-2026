@@ -414,18 +414,22 @@ function RxMenu({ position, kind, def, query, results, activeIndex, onSelect, on
   const ref = useRefP(null);
   useEffectP(() => {
     function onDoc(e) { if (ref.current && !ref.current.contains(e.target)) onClose(); }
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    // Différé d'un tick : l'item du SlashMenu déclenche sur mousedown et React
+    // monte ce menu pendant la propagation — sans le délai, ce mousedown
+    // fermerait aussitôt le menu (le clic ne lancerait pas la fonction).
+    const t = setTimeout(() => document.addEventListener('mousedown', onDoc), 0);
+    return () => { clearTimeout(t); document.removeEventListener('mousedown', onDoc); };
   }, [onClose]);
 
   const d = def || window.NOTE_DATA.ORDER_DEFS.rx;
   const favSet = d.favs;
-  const sections = [
-    [d.sections[0], results.favoris],
-    [d.sections[1], results.frequents],
-    [d.sections[2], results.autres],
-  ];
-  const total = results.favoris.length + results.frequents.length + results.autres.length;
+  const profil = results.profil || [];
+  const sections = [];
+  if (profil.length) sections.push(['Médications au dossier', profil]);
+  sections.push([d.sections[0], results.favoris]);
+  sections.push([d.sections[1], results.frequents]);
+  sections.push([d.sections[2], results.autres]);
+  const total = profil.length + results.favoris.length + results.frequents.length + results.autres.length;
   let flat = -1;
 
   return (
@@ -454,12 +458,18 @@ function RxMenu({ position, kind, def, query, results, activeIndex, onSelect, on
                     <div className="rx-item__sig">{it.sig}</div>
                   </div>
                   <div className="rx-item__actions">
-                    <button type="button" className={'rx-heart' + (fav ? ' is-fav' : '')}
-                      title={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={(e) => { e.stopPropagation(); onToggleFav(it.key); }}>
-                      <span className="material-icons">{fav ? 'favorite' : 'favorite_border'}</span>
-                    </button>
+                    {it.med
+                      ? <span title={it.medStatusLabel || ''} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: it.medStatus === 'active' ? '#1b8a3f' : '#c62828', whiteSpace: 'nowrap' }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: it.medStatus === 'active' ? '#1b8a3f' : '#c62828' }} />
+                          {it.medStatusLabel}
+                        </span>
+                      : <button type="button" className={'rx-heart' + (fav ? ' is-fav' : '')}
+                          title={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={(e) => { e.stopPropagation(); onToggleFav(it.key); }}>
+                          <span className="material-icons">{fav ? 'favorite' : 'favorite_border'}</span>
+                        </button>
+                    }
                     {it.active &&
                       <span className="rx-active" title="Déjà au dossier">
                         <span className="material-icons">check</span>

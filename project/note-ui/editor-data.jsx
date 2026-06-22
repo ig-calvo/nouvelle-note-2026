@@ -75,27 +75,9 @@ function _norm(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[\u
 // =========================================================
 // Rx search — commande « /rx » (favoris, fréquents, autres)
 // =========================================================
-const RX_FAVS = new Set(['actos15', 'amox500', 'vento100']);
+const RX_FAVS = new Set(['amox500', 'vento100']);
 
 const RX_ITEMS = [
-  { key: 'actos15', name: 'Actos', dose: '15mg', active: true,
-    sig: '1 comp. PO DIE, #30, 30j, R12',
-    chipSig: '1 comp. PO DIE #30 30j R12',
-    details: { molecule: 'Actos', dose: '15', unit: 'mg', form: 'comprimé', route: 'PO',
-      frequency: 'DIE', duration: '30', durationUnit: 'jours', quantity: '30', refills: '12',
-      indication: 'Diabète de type 2', notes: 'Pioglitazone.' } },
-  { key: 'actos15-freq', name: 'Actos', dose: '15mg', freq: true,
-    sig: '1 comprimé 1 fois par jour, #30, 30 jours, R2 mois, NPS C, Diabète de type 2',
-    chipSig: '1 comp. PO DIE #30 30j R2',
-    details: { molecule: 'Actos', dose: '15', unit: 'mg', form: 'comprimé', route: 'PO',
-      frequency: 'DIE', duration: '30', durationUnit: 'jours', quantity: '30', refills: '2',
-      indication: 'Diabète de type 2', notes: 'NPS C.' } },
-  { key: 'actos30-freq', name: 'Actos', dose: '30mg', freq: true,
-    sig: '1 comprimé 1 fois par jour, #30, 30 jours, R2 mois, NPS C, Diabète de type 2',
-    chipSig: '1 comp. PO DIE #30 30j R2',
-    details: { molecule: 'Actos', dose: '30', unit: 'mg', form: 'comprimé', route: 'PO',
-      frequency: 'DIE', duration: '30', durationUnit: 'jours', quantity: '30', refills: '2',
-      indication: 'Diabète de type 2', notes: 'NPS C.' } },
   { key: 'amox500', name: 'Amoxicilline', dose: '500mg',
     sig: '1 comp. PO TID, #21, 7j, R0',
     chipSig: '1 comp. PO TID #21 7j R0',
@@ -144,17 +126,35 @@ const RX_OTHERS = MED_CATALOG.map(function (m) {
 
 const RX_ALL = RX_ITEMS.concat(RX_OTHERS);
 
+// Médications au dossier du patient (profil pharmacologique — cf. sommaire).
+// Affichées en tête du menu /rx pour renouvellement / référence.
+const PATIENT_MEDS = [
+  { key: 'med-contraceptif', name: 'Contraceptif oral', dose: '', med: true, medStatus: 'active', medStatusLabel: 'actif',
+    sig: '1 co PO DIE — actif',
+    chipSig: '1 co PO DIE',
+    details: { molecule: 'Contraceptif oral', dose: '', unit: '', form: 'comprimé', route: 'PO',
+      frequency: 'DIE', duration: '', durationUnit: '', quantity: '', refills: '11',
+      indication: 'Contraception', notes: 'Profil actif au dossier.' } },
+  { key: 'med-nitrofurantoine', name: 'Nitrofurantoïne', dose: '100 mg', med: true, medStatus: 'cessée', medStatusLabel: 'cessée (ITU)',
+    sig: '1 co PO BID — cessée 12/2025',
+    chipSig: '1 co PO BID',
+    details: { molecule: 'Nitrofurantoïne', dose: '100', unit: 'mg', form: 'comprimé', route: 'PO',
+      frequency: 'BID', duration: '5', durationUnit: 'jours', quantity: '10', refills: '0',
+      indication: 'Infection urinaire', notes: 'Cessée 12/2025.' } },
+];
+
 function searchRx(q) {
   const nq = _norm((q || '').trim());
   const match = function (it) {
     return !nq || _norm(it.name).startsWith(nq) || (it.brand && _norm(it.brand).startsWith(nq));
   };
+  const profil = PATIENT_MEDS.filter(match);
   const favoris = RX_ALL.filter(function (it) { return RX_FAVS.has(it.key) && match(it); });
   const frequents = RX_ALL.filter(function (it) { return it.freq && !RX_FAVS.has(it.key) && match(it); });
   const autres = nq
     ? RX_ALL.filter(function (it) { return !it.freq && !RX_FAVS.has(it.key) && match(it); }).slice(0, 6)
     : [];
-  return { favoris, frequents, autres };
+  return { profil, favoris, frequents, autres };
 }
 
 function toggleRxFav(key) { RX_FAVS.has(key) ? RX_FAVS.delete(key) : RX_FAVS.add(key); }
@@ -461,5 +461,5 @@ const SCENARIOS = [
 ];
 
 window.NOTE_DATA = { ENTITY_TYPES, RECOGNIZERS, MED_CATALOG, SLASH_ITEMS, PATIENT, PROBLEMS, VITALS, RESULTS_RECENT, SCENARIOS,
-  RX_FAVS, RX_ITEMS, searchRx, toggleRxFav, deriveRx,
+  RX_FAVS, RX_ITEMS, PATIENT_MEDS, searchRx, toggleRxFav, deriveRx,
   ORDER_DEFS, orderKindForKbd, searchOrder, toggleOrderFav, deriveLabRx, deriveImgRx, deriveRefRx };
