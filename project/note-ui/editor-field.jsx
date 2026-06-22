@@ -1446,16 +1446,13 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
 
       }
       {funcMenu &&
-      <>
-        <div className="addmenu-scrim" onMouseDown={(e) => { e.preventDefault(); setFuncMenu(null); }} />
-        <SlashMenu
-          position={{ top: funcMenu.top, left: funcMenu.left }}
-          query=""
-          items={filterSlash('')}
-          activeIndex={-1}
-          onSelect={(it) => { setFuncMenu(null); chooseSlashItem(it); }}
-          onClose={() => setFuncMenu(null)} />
-      </>
+      <SlashMenu
+        position={{ top: funcMenu.top, left: funcMenu.left }}
+        query=""
+        items={filterSlash('')}
+        activeIndex={-1}
+        onSelect={(it) => { setFuncMenu(null); chooseSlashItem(it); }}
+        onClose={() => setFuncMenu(null)} />
       }
       <input
         ref={fileInputRef}
