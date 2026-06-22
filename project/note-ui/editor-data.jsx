@@ -590,30 +590,12 @@ function deriveRefRx(d) {
   return { name: name, dose: '', sig: sig, kind: 'ref' };
 }
 
-const RECOGNIZERS = [
-  { test: function(t) {
-      const m = t.match(/(?:^|\s)([a-zà-ÿ]{2,})\s*$/i);
-      if (!m) return null;
-      const q = _norm(m[1]);
-      const matches = MED_CATALOG.filter(function(x){
-        return _norm(x.stem).startsWith(q) || (x.brand && _norm(x.brand).startsWith(q));
-      });
-      if (matches.length === 0) return null;
-      return { matched: m[1], options: matches };
-    },
-    suggest: function(matched, options) {
-      return {
-        matched: matched,
-        options: options.map(function(o){
-          return {
-            stem: o.stem, label: o.label, text: o.text, brand: o.brand, klass: o.klass,
-            entity: { type: 'prescription', label: o.text, text: o.text, details: o.details },
-          };
-        }),
-      };
-    }
-  },
-];
+// Suggestions de médicaments en prose DÉSACTIVÉES : les suggestions
+// n'apparaissent désormais que via la fonction « /rx ». Avec le catalogue
+// élargi, des mots courants (« mo », « me », « na »…) déclenchaient le menu
+// pendant la frappe normale. Pour réactiver, rétablir le recognizer ci-dessous
+// (idéalement avec un préfixe minimal de 4+ lettres).
+const RECOGNIZERS = [];
 
 const SLASH_ITEMS = [
   // ── STRUCTURE ────────────────────────────────────────────
