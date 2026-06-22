@@ -799,11 +799,7 @@ function SectionTitle({ value, onChange, labelStyle }) {
     title: 'Cliquer pour renommer',
     onClick: function() { setDraft(value); setEditing(true); }
   },
-    value,
-    React.createElement('span', {
-      className: 'material-icons-outlined',
-      style: { fontSize: 13, marginLeft: 5, opacity: 0.35, verticalAlign: 'middle' }
-    }, 'edit')
+    value
   );
 }
 
