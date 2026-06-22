@@ -1317,7 +1317,8 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
           ref={addBtnRef}
           type="button" className="nf-add" title="Insérer une fonction"
           style={addBtnOffset !== null ? { marginTop: addBtnOffset + 'px' } : undefined}
-          onMouseDown={(e) => { e.preventDefault(); funcMenu ? setFuncMenu(null) : openFunctionsMenu(); }}>
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => { funcMenu ? setFuncMenu(null) : openFunctionsMenu(); }}>
           <span className="material-icons-outlined">add_circle_outline</span>
         </button>
         <div ref={hostRef} className="note-field" data-field-id={id} style={{ minHeight: "96px" }} />
