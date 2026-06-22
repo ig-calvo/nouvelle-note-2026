@@ -3,6 +3,73 @@
 // =========================================================
 const { useState: useStateP, useEffect: useEffectP, useRef: useRefP } = React;
 
+// ─────────────────────────────────────────────────────────
+// Posologie structurée (Prescription) — refonte d'après Figma
+// « Prescription - Vision » (node 3022:24791). Tokens : primaire
+// #2e38a6, label #484c51, erreur #cc3340, warning #b88114,
+// secondary-container #dedbef / #3a3167, radius 8.
+// ─────────────────────────────────────────────────────────
+const rxS = {
+  panel: { width: 600, maxWidth: 'calc(100vw - 24px)', maxHeight: 'calc(100vh - 24px)', display: 'flex', flexDirection: 'column', padding: 0 },
+  head: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid #eceef3', flexShrink: 0 },
+  rxIcon: { fontFamily: 'Georgia, "Times New Roman", serif', fontSize: 22, fontWeight: 700, color: '#232428', width: 32, textAlign: 'center', flexShrink: 0 },
+  molName: { font: "500 15px 'Poppins', sans-serif", color: '#232428', whiteSpace: 'nowrap' },
+  ramq: { display: 'inline-flex', alignItems: 'center', gap: 3, font: "500 12px 'Inter', sans-serif", color: '#484c51', whiteSpace: 'nowrap' },
+  alertChip: { display: 'inline-flex', alignItems: 'center', gap: 4, border: '1px solid #c3ccd5', borderRadius: 8, padding: '4px 8px', flexShrink: 0 },
+  closeBtn: { width: 36, height: 36, border: 0, background: 'transparent', borderRadius: 8, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#484c51', flexShrink: 0 },
+  body: { padding: '16px 18px 4px', overflowY: 'auto', flex: '1 1 auto', minHeight: 0 },
+  sec: { font: "700 11px 'Inter', sans-serif", letterSpacing: '0.7px', textTransform: 'uppercase', color: '#2e38a6', margin: '6px 0 16px' },
+  row: { display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20 },
+  foot: { display: 'flex', alignItems: 'center', padding: '12px 18px', borderTop: '1px solid #eceef3', flexShrink: 0 },
+  btnCancel: { border: '1px solid #c3ccd5', background: '#fff', color: '#3a3167', borderRadius: 8, padding: '9px 18px', font: "600 14px 'Inter', sans-serif", cursor: 'pointer' },
+  btnSave: { border: 0, background: '#dedbef', color: '#3a3167', borderRadius: 8, padding: '9px 22px', font: "600 14px 'Inter', sans-serif", cursor: 'pointer' },
+  fieldWrap: { position: 'relative', border: '1.5px solid #c3ccd5', borderRadius: 8, height: 44, display: 'flex', alignItems: 'center', background: '#fff', boxSizing: 'border-box' },
+  flabel: { position: 'absolute', top: -8, left: 10, background: '#fff', padding: '0 4px', font: "500 11px 'Inter', sans-serif", color: '#6b6f76', lineHeight: '16px', pointerEvents: 'none', whiteSpace: 'nowrap' },
+  input: { border: 0, outline: 'none', background: 'transparent', width: '100%', padding: '0 12px', font: "400 14px 'Inter', sans-serif", color: '#232428' },
+  select: { appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', border: 0, outline: 'none', background: 'transparent', width: '100%', padding: '0 30px 0 12px', font: "400 14px 'Inter', sans-serif", color: '#232428', cursor: 'pointer' },
+  chev: { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6b6f76', fontSize: 20 },
+};
+
+function _rxOpts(list, val) {
+  const v = (val == null ? '' : String(val));
+  return (v && list.indexOf(v) === -1) ? [v].concat(list) : list;
+}
+function RxFF({ label, required, value, onChange, placeholder, flex, width }) {
+  const [foc, setFoc] = useStateP(false);
+  return (
+    <div style={Object.assign({}, rxS.fieldWrap, foc ? { borderColor: '#2e38a6' } : {}, width ? { width: width, flex: '0 0 auto' } : { flex: flex || 1 })}>
+      <span style={Object.assign({}, rxS.flabel, foc ? { color: '#2e38a6' } : {})}>{label}{required ? <span style={{ color: '#cc3340' }}> *</span> : null}</span>
+      <input style={rxS.input} value={value == null ? '' : value} placeholder={placeholder || ''}
+        onFocus={() => setFoc(true)} onBlur={() => setFoc(false)}
+        onChange={(e) => onChange && onChange(e.target.value)} />
+    </div>
+  );
+}
+function RxSel({ label, required, value, onChange, options, placeholder, flex, width }) {
+  const [foc, setFoc] = useStateP(false);
+  const opts = _rxOpts(options, value);
+  return (
+    <div style={Object.assign({}, rxS.fieldWrap, foc ? { borderColor: '#2e38a6' } : {}, width ? { width: width, flex: '0 0 auto' } : { flex: flex || 1 })}>
+      <span style={Object.assign({}, rxS.flabel, foc ? { color: '#2e38a6' } : {})}>{label}{required ? <span style={{ color: '#cc3340' }}> *</span> : null}</span>
+      <select style={rxS.select} value={value == null ? '' : value}
+        onFocus={() => setFoc(true)} onBlur={() => setFoc(false)}
+        onChange={(e) => onChange && onChange(e.target.value)}>
+        {placeholder ? <option value="">{placeholder}</option> : null}
+        {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <span className="material-icons-outlined" style={rxS.chev}>expand_more</span>
+    </div>
+  );
+}
+function RxSwitch({ on, onToggle }) {
+  return (
+    <button type="button" onClick={onToggle} title="Ne pas substituer"
+      style={{ width: 44, height: 24, borderRadius: 12, border: 0, background: on ? '#2e38a6' : '#c3ccd5', position: 'relative', cursor: 'pointer', flexShrink: 0, transition: 'background 120ms' }}>
+      <span style={{ position: 'absolute', top: 2, left: on ? 22 : 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 120ms', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+    </button>
+  );
+}
+
 function ChipPopover({ chip, anchorRect, onClose, onSave, onRevert, onDelete }) {
   const [draft, setDraft] = useStateP(chip.entity);
   const ref = useRefP(null);
@@ -15,11 +82,67 @@ function ChipPopover({ chip, anchorRect, onClose, onSave, onRevert, onDelete }) 
     return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
   }, [onClose]);
   if (!anchorRect) return null;
+  const isRx = draft.type === 'prescription';
+  const W = isRx ? 600 : 380;
   const top = anchorRect.bottom + 8;
   let left = anchorRect.left;
-  if (left + 380 > window.innerWidth - 16) left = window.innerWidth - 396;
+  if (left + W > window.innerWidth - 16) left = Math.max(12, window.innerWidth - W - 16);
   const meta = window.NOTE_DATA.ENTITY_TYPES[draft.type] || {};
   function up(f, v) { setDraft(d => ({ ...d, details: { ...d.details, [f]: v } })); }
+
+  if (isRx) {
+    const d = draft.details || {};
+    return (
+      <div className="popover" ref={ref} style={Object.assign({}, rxS.panel, { top: top, left: left, width: W })} role="dialog">
+        <div style={rxS.head}>
+          <span style={rxS.rxIcon}>℞</span>
+          <span style={rxS.molName}>{d.molecule || 'Prescription'}</span>
+          <span style={rxS.ramq}>RAMQ <span className="material-icons-outlined" style={{ fontSize: 16, color: '#cc3340' }}>do_not_disturb_on</span></span>
+          <span style={{ flex: 1 }} />
+          <span style={rxS.alertChip}>
+            <span className="material-icons-outlined" style={{ fontSize: 18, color: '#484c51' }}>medication</span>
+            <span className="material-icons-outlined" style={{ fontSize: 18, color: '#b88114' }}>warning</span>
+          </span>
+          <button style={rxS.closeBtn} onClick={onClose}><span className="material-icons-outlined">close</span></button>
+        </div>
+        <div style={rxS.body}>
+          <div style={rxS.sec}>Médicament et posologie</div>
+          <div style={rxS.row}>
+            <RxFF label="Produit" value={d.molecule} onChange={(v) => up('molecule', v)} />
+            <RxFF label="Force et forme" value={d.form} onChange={(v) => up('form', v)} />
+            <RxSwitch on={!!d.noSubstitution} onToggle={() => up('noSubstitution', !d.noSubstitution)} />
+          </div>
+          <div style={rxS.row}>
+            <RxFF label="Dose" required value={d.dose} onChange={(v) => up('dose', v)} flex={1.35} />
+            <RxSel label="Voie" required value={d.route} onChange={(v) => up('route', v)} options={['PO', 'IM', 'IV', 'SC', 'Inhalé', 'SL', 'Top.', 'Rect.']} flex={1.35} />
+            <RxSel label="Fréquence" required value={d.frequency} onChange={(v) => up('frequency', v)} options={['DIE', 'BID', 'TID', 'QID', 'HS', 'q4-6h PRN', 'QID PRN', 'AC', 'PC']} flex={1.85} />
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: "400 14px 'Inter',sans-serif", color: '#232428', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <input type="checkbox" checked={!!d.prn} onChange={(e) => up('prn', e.target.checked)} style={{ width: 18, height: 18, accentColor: '#2e38a6' }} />
+              PRN
+            </label>
+          </div>
+          <div style={rxS.sec}>Durée et renouvellement</div>
+          <div style={rxS.row}>
+            <RxSel label="Durée" value={d.duration} onChange={(v) => up('duration', v)} options={['7', '10', '14', '21', '30', '60', '90', '180', '365']} flex={1} />
+            <RxSel label="Unité" value={d.durationUnit} onChange={(v) => up('durationUnit', v)} options={['jours', 'semaines', 'mois']} flex={1} />
+            <RxFF label="Quantité" value={d.quantity} onChange={(v) => up('quantity', v)} placeholder="Quantité" flex={1} />
+            <RxSel label="Unité" value={d.quantityUnit} onChange={(v) => up('quantityUnit', v)} options={['comprimé(s)', 'capsule(s)', 'mL', 'application(s)', 'inhalation(s)']} placeholder="Unité" flex={1} />
+          </div>
+          <div style={rxS.row}>
+            <RxSel label="Renouvellement" required value={d.refills} onChange={(v) => up('refills', v)} options={['0', '1', '2', '3', '4', '5', '6', '11', '12']} flex={1.3} />
+            <RxFF label="Fin de traitement" value={d.finTraitement} onChange={(v) => up('finTraitement', v)} placeholder="Fin de traitement" flex={2} />
+            <RxSel label="Mois" value={d.moisRenouv} onChange={(v) => up('moisRenouv', v)} options={['Jours', 'Semaines', 'Mois']} placeholder="Mois" flex={2} />
+          </div>
+        </div>
+        <div style={rxS.foot}>
+          <button style={rxS.btnCancel} onClick={onClose}>Annuler</button>
+          <span style={{ flex: 1 }} />
+          <button style={rxS.btnSave} onClick={() => onSave(chip.id, draft)}>Enregistrer</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="popover" ref={ref} style={{ top, left }} role="dialog">
       <div className="popover-head">
@@ -31,7 +154,6 @@ function ChipPopover({ chip, anchorRect, onClose, onSave, onRevert, onDelete }) 
         <button className="close" onClick={onClose}><span className="material-symbols-outlined">close</span></button>
       </div>
       <div className="popover-body">
-        {draft.type === 'prescription' && <RxFields d={draft.details} up={up} />}
         {draft.type === 'lab' && <LabFields d={draft.details} up={up} />}
         {draft.type === 'imaging' && <ImgFields d={draft.details} up={up} />}
         {draft.type === 'problem' && <PbFields d={draft.details} up={up} />}
