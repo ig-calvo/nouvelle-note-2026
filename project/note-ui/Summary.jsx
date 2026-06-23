@@ -65,6 +65,25 @@ function Summary() {
   var [sectionIds, setSectionIds] = React.useState(SECTION_CFG.map(function(s){ return s.id; }));
   var [showPrint, setShowPrint] = React.useState(false);
   var [dragSrc, setDragSrc] = React.useState(null);
+  var [pending, setPending] = React.useState({}); // { sectionId: [{id,type,label}] } — éléments en attente venant de la note
+
+  // Chaque élément ajouté dans la note clinique apparaît « en attente » dans la
+  // section correspondante du Sommaire (mappage type de chip → section).
+  React.useEffect(function() {
+    var MAP = { prescription:'meds', problem:'problems', diagnostic:'problems', lab:'results', imaging:'results' };
+    function onItems(e) {
+      var list = (e.detail && e.detail.items) || [];
+      var grouped = {};
+      list.forEach(function(it) {
+        var sec = MAP[it.type];
+        if (!sec) return;
+        (grouped[sec] = grouped[sec] || []).push(it);
+      });
+      setPending(grouped);
+    }
+    window.addEventListener('note:items-change', onItems);
+    return function() { window.removeEventListener('note:items-change', onItems); };
+  }, []);
 
   function addItem(section, item) {
     setData(function(prev) {
@@ -126,6 +145,20 @@ function Summary() {
     setDragSrc(idx);
   }
 
+  // Glisser un en-tête de section vers la note clinique (copie son contenu).
+  // stopPropagation est ESSENTIEL : le dragstart du <span> remonte sinon jusqu'au
+  // <div> SummaryBox dont le onDragStart (réordonnancement) écrase effectAllowed
+  // en 'move'. Un dropEffect 'copy' devient alors incompatible et le navigateur
+  // refuse le drop (l'événement `drop` ne se déclenche jamais, même si `dragover`
+  // continue d'afficher la barre de dépôt).
+  function startNoteDrag(e, cfg, items) {
+    e.stopPropagation();
+    window.__omniSummaryDrag = { sectionId: cfg.id, label: cfg.label, items: (items || []).slice() };
+    try { e.dataTransfer.setData('text/omni-section', cfg.id); } catch (err) {}
+    e.dataTransfer.effectAllowed = 'copy';
+  }
+  function endNoteDrag(e) { if (e && e.stopPropagation) e.stopPropagation(); window.__omniSummaryDrag = null; }
+
   var orderedCfg = sectionIds.map(function(id){ return SECTION_CFG.find(function(s){ return s.id===id; }); });
 
   function ActiveModal() {
@@ -182,11 +215,14 @@ function Summary() {
               key={cfg.id}
               cfg={cfg}
               items={items}
+              pending={pending[cfg.id] || []}
               reorder={reorder}
               draggable={reorder}
               onDragStart={function(e){ onDragStart(e, idx); }}
               onDragOver={function(e){ onDragOver(e, idx); }}
               onDragEnd={function(){ setDragSrc(null); }}
+              onNoteDragStart={function(e){ startNoteDrag(e, cfg, items); }}
+              onNoteDragEnd={endNoteDrag}
               onAdd={function(){ setModal({ section:cfg.id, type:'add' }); }}
               onTitle={function(){ if (cfg.list||cfg.dots) setModal({ section:cfg.id, type:'list' }); }}
             />
@@ -200,21 +236,34 @@ function Summary() {
   );
 }
 
-function SummaryBox({ cfg, items, reorder, draggable, onDragStart, onDragOver, onDragEnd, onAdd, onTitle }) {
+function SummaryBox({ cfg, items, pending, reorder, draggable, onDragStart, onDragOver, onDragEnd, onNoteDragStart, onNoteDragEnd, onAdd, onTitle }) {
+  pending = pending || [];
+  // Réordonnancement actif uniquement en mode `reorder`. Sinon ces handlers NE
+  // doivent PAS exister : le dragstart du <span> « Glisser vers la note » remonte
+  // sinon jusqu'à ce <div> et onDragStart écrase effectAllowed='copy' en 'move',
+  // ce qui fait refuser le drop par le navigateur (le `drop` ne se déclenche
+  // jamais alors que `dragover` affiche pourtant la barre de dépôt).
   return (
     <div
       style={{ ...suS.section, ...(reorder ? suS.sectionDrag : {}) }}
       draggable={draggable}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDragEnd={onDragEnd}
+      onDragStart={reorder ? onDragStart : undefined}
+      onDragOver={reorder ? onDragOver : undefined}
+      onDragEnd={reorder ? onDragEnd : undefined}
     >
       <div style={suS.sHead}>
         {reorder && <span className="material-icons" style={{ fontSize:16, color:'rgba(0,0,0,0.3)', cursor:'grab', marginRight:4 }}>drag_indicator</span>}
-        <span className="material-icons-outlined" style={suS.sIcon}>{cfg.icon}</span>
-        <button style={suS.labelBtn} onClick={onTitle}>
-          <span style={suS.sLabel}>{cfg.label}</span>
-        </button>
+        <span
+          draggable={!reorder}
+          onDragStart={!reorder ? onNoteDragStart : undefined}
+          onDragEnd={!reorder ? onNoteDragEnd : undefined}
+          title={!reorder ? 'Glisser vers la note' : undefined}
+          style={{ display:'flex', alignItems:'center', gap:7, flex:1, minWidth:0, cursor: reorder ? 'inherit' : 'grab' }}>
+          <span className="material-icons-outlined" style={suS.sIcon}>{cfg.icon}</span>
+          <button style={suS.labelBtn} onClick={onTitle}>
+            <span style={suS.sLabel}>{cfg.label}</span>
+          </button>
+        </span>
         {cfg.dots && (
           <button style={suS.addBtn} onClick={onTitle} title="Ouvrir les médicaments">
             <span className="material-icons" style={{ fontSize:20 }}>more_vert</span>
@@ -226,10 +275,17 @@ function SummaryBox({ cfg, items, reorder, draggable, onDragStart, onDragOver, o
           </button>
         )}
       </div>
-      {items.length > 0 && (
+      {(items.length > 0 || pending.length > 0) && (
         <div style={suS.rows}>
           {items.slice(0, 6).map(function(r, i){ return <SummaryRow key={i} r={r} sId={cfg.id} />; })}
           {items.length > 6 && <div style={suS.more}>+{items.length-6} de plus</div>}
+          {pending.map(function(p, i){ return (
+            <div key={'p'+i} style={suS.row}>
+              <span className="material-icons-outlined" style={{ fontSize:13, color:'#c07a00', flexShrink:0, width:14 }}>schedule</span>
+              <span style={{ ...suS.rLeft, color:'rgba(0,0,0,0.5)', fontStyle:'italic', maxWidth:130 }}>{p.label}</span>
+              <span style={suS.pendingTag}>En attente</span>
+            </div>
+          ); })}
         </div>
       )}
     </div>
@@ -302,6 +358,7 @@ var suS = {
   rMid:{ color:'rgba(0,0,0,0.52)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontSize:12 },
   rRight:{ color:'rgba(0,0,0,0.45)', fontSize:11, fontVariantNumeric:'tabular-nums', flexShrink:0 },
   more:{ fontSize:11, color:'#1975d1', cursor:'pointer' },
+  pendingTag:{ fontSize:9, fontWeight:700, color:'#c07a00', background:'#fdf3e2', borderRadius:4, padding:'1px 5px', letterSpacing:0.3, textTransform:'uppercase', marginLeft:'auto', flexShrink:0, whiteSpace:'nowrap' },
 };
 
 window.Summary = Summary;

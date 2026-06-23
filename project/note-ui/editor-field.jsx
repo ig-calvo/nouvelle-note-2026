@@ -471,6 +471,10 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
   const [, setFavBump] = useStateE(0); // re-render when favorites toggle
   const [addBtnOffset, setAddBtnOffset] = useStateE(null); // null = CSS default (unfocused)
   const [diagRename, setDiagRename] = useStateE(null); // { id, value, pos:{top,left} } — diagnostic rename popover
+  const [chipMenu, setChipMenu] = useStateE(null); // { cid, rect } — hover menu (Modifier / Supprimer) on order chips
+  const [chipDelete, setChipDelete] = useStateE(null); // { cid, rect } — delete confirmation popover
+  const chipMenuTimerRef = useRefE(null);
+  const [dropCaret, setDropCaret] = useStateE(null); // { left, top, width } — barre de dépôt (horizontale) lors d'un glisser depuis le Sommaire
   const addBtnRef = useRefE(null);
   const fileInputRef = useRefE(null);
   const slashFmtRef = useRefE(null); // {index, length} of the highlighted "/command" run
@@ -656,6 +660,49 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       }
     });
 
+    // Hover menu (Modifier / Supprimer) on order chips — show on chip hover,
+    // close shortly after the pointer leaves (cancelled if it enters the menu).
+    q.root.addEventListener('mouseover', (e) => {
+      const chipEl = e.target.closest('.chip--rx[data-cid]');
+      if (!chipEl) return;
+      cancelChipMenuClose();
+      const cid = chipEl.getAttribute('data-cid');
+      setChipMenu((cm) => (cm && cm.cid === cid) ? cm : { cid, rect: chipEl.getBoundingClientRect() });
+    });
+    q.root.addEventListener('mouseout', (e) => {
+      if (e.target.closest('.chip--rx[data-cid]')) scheduleChipMenuClose();
+    });
+
+    // Glisser une section du Sommaire → ligne de dépôt + insertion au release.
+    // capture:true so our handlers fire before Quill's own drag-drop handler.
+    // dragenter must also be cancelled — real browsers require it for `drop` to
+    // fire on a contenteditable; without it the bar shows but the drop is dropped.
+    q.root.addEventListener('dragenter', (e) => {
+      if (!isSummaryDrag(e)) return;
+      e.preventDefault(); e.stopPropagation();
+      try { e.dataTransfer.dropEffect = 'copy'; } catch (er) {}
+    }, true);
+    q.root.addEventListener('dragover', (e) => {
+      if (!isSummaryDrag(e)) return;
+      e.preventDefault(); e.stopPropagation();
+      try { e.dataTransfer.dropEffect = 'copy'; } catch (er) {}
+      const info = getDropLineInfo(e.clientX, e.clientY);
+      if (info) setDropCaret({ top: info.top, left: info.left, width: info.width });
+    }, true);
+    q.root.addEventListener('dragleave', (e) => {
+      if (!isSummaryDrag(e)) return;
+      if (!q.root.contains(e.relatedTarget)) setDropCaret(null);
+    }, true);
+    q.root.addEventListener('drop', (e) => {
+      if (!isSummaryDrag(e)) return;
+      e.preventDefault(); e.stopPropagation();
+      const payload = window.__omniSummaryDrag;
+      const info = getDropLineInfo(e.clientX, e.clientY);
+      setDropCaret(null);
+      window.__omniSummaryDrag = null;
+      if (payload && info) insertSummarySection(info.idx, payload);
+    }, true);
+
     // Keyboard: Tab accepts ghost; slash nav handled on keydown capture
     q.root.addEventListener('keydown', onKeyDownCapture, true);
 
@@ -768,6 +815,21 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     lastStoredRef.current = value || '';
     if (sel) {try {q.setSelection(sel.index, 0, 'silent');} catch {}}
   }, [value]);
+
+  // Reopen the + functions menu when the clinical-tool picker's back arrow fires.
+  // The picker lives in NoteEditor and echoes back our field id, so only the
+  // field that opened it reacts (each field mounts its own listener).
+  useEffectE(function() {
+    function onAddMenuOpen(e) {
+      if (e.detail && e.detail.id !== id) return;
+      const btn = addBtnRef.current;
+      if (!btn) return;
+      const r = btn.getBoundingClientRect();
+      setFuncMenu({ top: r.bottom + 6, left: r.left });
+    }
+    window.addEventListener('ct-addmenu-open', onAddMenuOpen);
+    return function() { window.removeEventListener('ct-addmenu-open', onAddMenuOpen); };
+  }, [id]);
 
   // --- reflect chips-map changes (label edits, inline field edits, linked highlight) without full reset
   useEffectE(() => {
@@ -1010,7 +1072,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       const btn = addBtnRef.current;
       const rect = btn ? btn.getBoundingClientRect() : { left: 16, top: 72, bottom: 96 };
       setFuncMenu(null); setSlash(null); slashStateRef.current = null;
-      window.dispatchEvent(new CustomEvent('ct-picker-open', { detail: { rect } }));
+      window.dispatchEvent(new CustomEvent('ct-picker-open', { detail: { rect, id } }));
       return;
     }
     if (it.rxSearch || it.orderSearch) { enterOrderMode(it.kbd || 'rx'); return; }
@@ -1324,6 +1386,163 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     setFuncMenu({ top: r.bottom + 6, left: r.left });
   }
 
+  // ---------------------------------------------------------
+  // Menu de survol des chips d'ordonnance (Modifier / Supprimer)
+  // ---------------------------------------------------------
+  function cancelChipMenuClose() { if (chipMenuTimerRef.current) { clearTimeout(chipMenuTimerRef.current); chipMenuTimerRef.current = null; } }
+  function scheduleChipMenuClose() {
+    cancelChipMenuClose();
+    chipMenuTimerRef.current = setTimeout(function() { setChipMenu(null); }, 180);
+  }
+
+  // Quill index of the chip embed whose data-cid matches.
+  function chipIndexByCid(cid) {
+    const q = quillRef.current; if (!q) return -1;
+    const node = q.root.querySelector('.chip[data-cid="' + cid + '"]');
+    if (!node) return -1;
+    try { const blot = Quill.find(node); if (blot) return q.getIndex(blot); } catch (e) {}
+    return -1;
+  }
+
+  // Reconstruit le texte lisible d'un chip d'ordonnance à partir de ses segments
+  // visibles (nom, dose, posologie…), en ignorant l'icône et les séparateurs.
+  function chipPlainText(cid) {
+    const q = quillRef.current; if (!q) return '';
+    const node = q.root.querySelector('.chip[data-cid="' + cid + '"]');
+    if (!node) return '';
+    const keep = ['chip-rx-name', 'chip-rx-dose', 'chip-rx-form', 'chip-rx-route', 'chip-rx-freq', 'chip-rx-dur', 'chip-rx-badge', 'chip-rx-sig'];
+    const parts = [];
+    node.querySelectorAll('span').forEach(function(sp) {
+      if (keep.some(function(c) { return sp.classList.contains(c); })) {
+        const t = (sp.textContent || '').trim();
+        if (t) parts.push(t);
+      }
+    });
+    return parts.join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  // Supprime le chip (l'embed Quill) à l'index donné, en propageant le changement.
+  function applyChipEdit(cid, replacementText) {
+    const q = quillRef.current; if (!q) return;
+    const idx = chipIndexByCid(cid);
+    if (idx < 0) return;
+    silentRef.current = true;
+    q.deleteText(idx, 1, 'silent');
+    if (replacementText) q.insertText(idx, replacementText, 'silent');
+    silentRef.current = false;
+    const stored = deltaToStored(q.getContents());
+    lastStoredRef.current = stored;
+    onChange(stored);
+  }
+
+  function deleteChipFromMenu(cid) { applyChipEdit(cid, null); }
+  function keepChipAsText(cid) { applyChipEdit(cid, chipPlainText(cid)); }
+
+  useEffectE(function() {
+    if (!chipDelete && !chipMenu) return;
+    function onKey(e) { if (e.key === 'Escape') { setChipDelete(null); setChipMenu(null); } }
+    document.addEventListener('keydown', onKey);
+    return function() { document.removeEventListener('keydown', onKey); };
+  }, [chipDelete, chipMenu]);
+
+  // ---------------------------------------------------------
+  // Glisser-déposer d'une section du Sommaire dans la note
+  // ---------------------------------------------------------
+  function isSummaryDrag(e) {
+    const t = e.dataTransfer && e.dataTransfer.types;
+    if (t && Array.prototype.indexOf.call(t, 'text/omni-section') !== -1) return true;
+    return !!window.__omniSummaryDrag;
+  }
+  function caretRangeFromPoint(x, y) {
+    if (document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y);
+    if (document.caretPositionFromPoint) {
+      const p = document.caretPositionFromPoint(x, y);
+      if (p) { const r = document.createRange(); r.setStart(p.offsetNode, p.offset); r.collapse(true); return r; }
+    }
+    return null;
+  }
+  // Returns { idx, top, left, width } for the line nearest (x,y).
+  // Uses Quill.find to translate the DOM range without touching Quill's selection
+  // (q.getSelection(true) calls focus() which restores the saved caret, not the drop pos).
+  function getDropLineInfo(x, y) {
+    const q = quillRef.current; if (!q) return null;
+    const editorRect = q.root.getBoundingClientRect();
+    let lineIdx = Math.max(0, q.getLength() - 1);
+    let top = y;
+    const domRange = caretRangeFromPoint(x, y);
+    if (domRange && q.root.contains(domRange.startContainer)) {
+      try {
+        let node = domRange.startContainer;
+        if (node.nodeType === 3) node = node.parentElement;
+        while (node && node !== q.root) {
+          let blot = null;
+          try { blot = Quill.find(node); } catch (e2) {}
+          if (blot) {
+            let idx = q.getIndex(blot);
+            try { const li = q.getLine(idx); if (li && li[0]) idx = q.getIndex(li[0]); } catch (e3) {}
+            lineIdx = idx;
+            break;
+          }
+          node = node.parentElement;
+        }
+      } catch (e) {}
+      try { const b = q.getBounds(lineIdx); top = editorRect.top + b.top; } catch (e) {}
+    }
+    return { idx: lineIdx, top: top, left: editorRect.left, width: editorRect.width };
+  }
+  function summaryItemText(sectionId, item) {
+    if (!item) return '';
+    if (sectionId === 'allergies') return item.name || item.left || '';
+    if (sectionId === 'habits') return [item.name, item.detail].filter(Boolean).join(' : ');
+    const head = item.left || item.name || '';
+    const mid = item.mid || item.detail || '';
+    const right = item.right || item.date || '';
+    let s = head;
+    if (mid) s += ' ' + mid;
+    if (right) s += ' (' + right + ')';
+    return s.trim();
+  }
+
+  // Insère le contenu d'une section du Sommaire à l'index donné. Les médicaments
+  // deviennent des chips de prescription ; les autres items, du texte à puces.
+  function insertSummarySection(index, payload) {
+    const q = quillRef.current; if (!q || !payload) return;
+    const sectionId = payload.sectionId, label = payload.label || '', items = payload.items || [];
+    silentRef.current = true;
+    let at = index;
+    if (at > 0 && q.getText(at - 1, 1) !== '\n') { q.insertText(at, '\n', 'silent'); at += 1; }
+    q.insertText(at, label, 'silent'); at += label.length;
+    q.insertText(at, '\n', 'silent'); at += 1;
+    const added = [];
+    if (items.length === 0) {
+      const empty = '• (aucun élément au dossier)';
+      q.insertText(at, empty, 'silent'); at += empty.length;
+      q.insertText(at, '\n', 'silent'); at += 1;
+    }
+    items.forEach(function(item) {
+      q.insertText(at, '• ', 'silent'); at += 2;
+      if (sectionId === 'meds') {
+        const cid = newChipId();
+        const name = (item.name || '').replace(/[…\.]+$/, '').trim() || 'Médicament';
+        const rx = { name: name, dose: '', sig: item.detail || '', kind: 'rx' };
+        const meta = window.NOTE_DATA.ENTITY_TYPES['prescription'] || {};
+        q.insertEmbed(at, 'chip', { cid: cid, type: 'prescription', label: name, icon: meta.icon || 'bookmark', rx: rx }, 'silent');
+        at += 1;
+        added.push({ chipId: cid, entity: { type: 'prescription', label: name, rx: rx } });
+      } else {
+        const txt = summaryItemText(sectionId, item);
+        q.insertText(at, txt, 'silent'); at += txt.length;
+      }
+      q.insertText(at, '\n', 'silent'); at += 1;
+    });
+    silentRef.current = false;
+    added.forEach(function(c) { onAddChip(id, { chipId: c.chipId, entity: c.entity }); });
+    const stored = deltaToStored(q.getContents());
+    lastStoredRef.current = stored;
+    onChange(stored);
+    try { q.setSelection(at, 0, 'silent'); } catch (e) {}
+  }
+
   return (
     <>
       <div className="note-field-shell">
@@ -1468,6 +1687,84 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         onSelect={(it) => { setFuncMenu(null); chooseSlashItem(it); }}
         onClose={() => setFuncMenu(null)} />
       }
+      {/* Menu de survol des chips d'ordonnance — bouton segmenté Modifier / Supprimer */}
+      {chipMenu && !chipDelete && (function() {
+        const r = chipMenu.rect;
+        const placeBelow = r.top < 56;
+        const top = placeBelow ? r.bottom + 8 : r.top - 48;
+        const left = Math.max(8, Math.min(r.left, window.innerWidth - 180));
+        return (
+          <div
+            style={Object.assign({ position: 'fixed', top: top, left: left, zIndex: 200 }, cmS.bar)}
+            onMouseEnter={cancelChipMenuClose}
+            onMouseLeave={scheduleChipMenuClose}>
+            <button
+              style={cmS.segStart}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                const cid = chipMenu.cid, rect = chipMenu.rect;
+                setChipMenu(null);
+                onChipClickRef.current(cid, rect, { action: 'modal' });
+              }}>
+              <span className="material-icons-outlined" style={{ fontSize: 20 }}>edit</span>
+              Modifier
+            </button>
+            <button
+              style={cmS.segEnd}
+              title="Supprimer"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { cancelChipMenuClose(); setChipDelete({ cid: chipMenu.cid, rect: chipMenu.rect }); setChipMenu(null); }}>
+              <span className="material-icons-outlined" style={{ fontSize: 20, color: '#ba1a1a' }}>delete</span>
+            </button>
+          </div>
+        );
+      })()}
+
+      {/* Confirmation de suppression — effacer ou conserver en texte */}
+      {chipDelete && (function() {
+        const r = chipDelete.rect;
+        const W = 304;
+        const top = r.bottom + 8;
+        const left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8));
+        const isRx = chips[chipDelete.cid] && chips[chipDelete.cid].entity && chips[chipDelete.cid].entity.type === 'prescription';
+        const noun = isRx ? 'cette prescription' : 'cet élément';
+        return (
+          <React.Fragment>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 209 }} onMouseDown={() => setChipDelete(null)} />
+            <div style={Object.assign({ position: 'fixed', top: top, left: left, width: W, zIndex: 210 }, cmS.confirm)}>
+              <div style={cmS.confirmHead}>
+                <span style={cmS.confirmTitle}>Supprimer {noun}&nbsp;?</span>
+                <button style={cmS.confirmClose} title="Annuler" onClick={() => setChipDelete(null)}>
+                  <span className="material-icons" style={{ fontSize: 20, color: 'rgba(0,0,0,0.5)' }}>close</span>
+                </button>
+              </div>
+              <p style={cmS.confirmBody}>
+                Retirer complètement {noun} de la note, ou la conserver sous forme de texte simple&nbsp;?
+              </p>
+              <div style={cmS.confirmActions}>
+                <button style={cmS.btnKeep}
+                  onClick={() => { keepChipAsText(chipDelete.cid); setChipDelete(null); }}>
+                  Garder en texte
+                </button>
+                <button style={cmS.btnDelete}
+                  onClick={() => { deleteChipFromMenu(chipDelete.cid); setChipDelete(null); }}>
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          </React.Fragment>
+        );
+      })()}
+
+      {/* Ligne de dépôt (horizontale, pleine largeur) lors d'un glisser depuis le Sommaire */}
+      {dropCaret &&
+        <div style={{
+          position: 'fixed', left: dropCaret.left, top: dropCaret.top - 1, width: dropCaret.width, height: 3,
+          background: '#1975d1', zIndex: 120, pointerEvents: 'none', borderRadius: 2,
+          boxShadow: '0 0 0 1px rgba(25,117,209,0.22)',
+        }} />
+      }
+
       <input
         ref={fileInputRef}
         type="file"
@@ -1478,6 +1775,46 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     </>);
 
 }
+
+// Styles du menu de survol des chips (bouton segmenté Material 3) + confirmation
+const cmS = {
+  bar: {
+    display: 'inline-flex', alignItems: 'center', background: '#fff',
+    borderRadius: 8, boxShadow: '0 4px 14px rgba(37,36,94,0.16)',
+    fontFamily: "'Inter', sans-serif", userSelect: 'none',
+  },
+  segStart: {
+    display: 'inline-flex', alignItems: 'center', gap: 8,
+    height: 40, padding: '0 14px', boxSizing: 'border-box',
+    border: '1px solid #c3ccd5', borderRadius: '8px 0 0 8px',
+    background: '#fff', cursor: 'pointer',
+    font: "500 14px 'Inter',sans-serif", color: '#303336', letterSpacing: 0.25,
+  },
+  segEnd: {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    height: 40, width: 44, marginLeft: -1, boxSizing: 'border-box',
+    border: '1px solid #c3ccd5', borderRadius: '0 8px 8px 0',
+    background: '#fff', cursor: 'pointer',
+  },
+  confirm: {
+    background: '#fff', border: '1px solid #e2e2ec', borderRadius: 12,
+    boxShadow: '0 14px 40px rgba(37,36,94,0.22)', padding: '14px 16px 16px',
+    fontFamily: "'Inter', sans-serif", animation: 'pop-in 130ms ease-out',
+  },
+  confirmHead: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
+  confirmTitle: { font: "600 15px 'Poppins',sans-serif", color: 'rgba(0,0,0,0.85)' },
+  confirmClose: { border: 0, background: 'transparent', cursor: 'pointer', padding: 0, display: 'inline-flex', marginTop: -2 },
+  confirmBody: { fontSize: 13, color: 'rgba(0,0,0,0.6)', lineHeight: 1.45, margin: '8px 0 14px' },
+  confirmActions: { display: 'flex', gap: 8, justifyContent: 'flex-end' },
+  btnKeep: {
+    border: '1px solid #d0d0e0', borderRadius: 8, background: '#fff',
+    padding: '8px 14px', cursor: 'pointer', font: "600 13px 'Inter',sans-serif", color: '#25245E',
+  },
+  btnDelete: {
+    border: 0, borderRadius: 8, background: '#ba1a1a',
+    padding: '8px 16px', cursor: 'pointer', font: "600 13px 'Inter',sans-serif", color: '#fff',
+  },
+};
 
 // ---------------------------------------------------------
 // DiagRenamePopover — inline editor to rename a diagnostic (click its header name)

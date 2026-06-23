@@ -147,6 +147,7 @@
     'note-ui/AIBox.jsx',
     'note-ui/ClinicalTool.jsx',
     'note-ui/ClinicalToolPicker.jsx',
+    'note-ui/CheckoutModal.jsx',
     'note-ui/NoteEditor.jsx',
     'note-ui/NoteStartCards.jsx',
     'note-ui/SmartNoteModal.jsx',
@@ -232,6 +233,8 @@ function App() {
               onOpen={handleNoteOpen}
               onComplete={handleNoteComplete}
               completeRef={noteCompleteRef}
+              doctorName={t.doctorName}
+              institution="Clinique du Centre-ville"
               smartActive={smartActive} />
             <NotesList doctorName={t.doctorName} extraNotes={completedNotes} />
             {noteOpen &&

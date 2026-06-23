@@ -18,7 +18,7 @@ function scanDiagNames(sections) {
   return out;
 }
 
-function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
+function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doctorName, institution }) {
   const DEFAULT_SECTIONS = [
     { id: 'sec-details',    title: 'Détails de la consultation', content: '' },
     { id: 'sec-conclusion', title: 'Conclusion',                 content: '' },
@@ -42,6 +42,9 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
   const [toolOpen, setToolOpen] = React.useState(false);
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [pickerAnchor, setPickerAnchor] = React.useState(null);
+  const [pickerSourceId, setPickerSourceId] = React.useState(null);
+  const [checkoutOpen, setCheckoutOpen] = React.useState(false);
+  const [checkoutGroups, setCheckoutGroups] = React.useState([]);
   const [noteDate, setNoteDate] = React.useState(function() { return new Date().toISOString().slice(0, 10); });
   const [noteTime, setNoteTime] = React.useState(function() { return new Date().toTimeString().slice(0, 5); });
   const [visitType, setVisitType] = React.useState('Visite en clinique');
@@ -51,6 +54,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
   const [toolBodyCollapsed, setToolBodyCollapsed] = React.useState(false);
 
   const [raison, setRaison] = React.useState('');
+  const noteCardRef = React.useRef(null);
 
   // --- drag-to-place tool state
   // toolLoc: 'default' | sectionId
@@ -69,6 +73,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
   React.useEffect(function() {
     function onPickerOpen(e) {
       setPickerAnchor((e.detail && e.detail.rect) || null);
+      setPickerSourceId((e.detail && e.detail.id) || null);
       setPickerOpen(true);
     }
     window.addEventListener('ct-picker-open', onPickerOpen);
@@ -98,6 +103,16 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
     var dxCount = scanDiagNames(sections).length;
     if (dxCount) counts.diagnostic = dxCount;
     window.dispatchEvent(new CustomEvent('note:chips-change', { detail: counts }));
+
+    // Liste détaillée des éléments présents dans la note → le Sommaire affiche
+    // chacun en « pending » dans sa section correspondante.
+    var items = [];
+    Object.keys(present).forEach(function(id) {
+      var c = chips[id];
+      if (c && c.entity && c.entity.type) items.push({ id: id, type: c.entity.type, label: c.entity.label });
+    });
+    scanDiagNames(sections).forEach(function(nm, i) { items.push({ id: 'dx-' + i, type: 'diagnostic', label: nm }); });
+    window.dispatchEvent(new CustomEvent('note:items-change', { detail: { items: items } }));
   }, [chips, sections, sectionSplits]);
 
   // ----- section content helpers -----
@@ -306,6 +321,80 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
   var popoverChip = popover && chips[popover.chipId] ?
     { id: popover.chipId, entity: chips[popover.chipId].entity } : null;
 
+  // Handle summary section drops anywhere on the note
+  React.useEffect(function() {
+    function handleDragEnter(e) {
+      if (!window.__omniSummaryDrag) return;
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    function handleDragOver(e) {
+      if (!window.__omniSummaryDrag) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try { e.dataTransfer.dropEffect = 'copy'; } catch (er) {}
+    }
+    function handleDrop(e) {
+      if (!window.__omniSummaryDrag) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var payload = window.__omniSummaryDrag;
+      window.__omniSummaryDrag = null;
+      if (payload && sections.length > 0) {
+        insertSummaryContent(0, payload);
+      }
+    }
+    var card = noteCardRef.current;
+    if (!card) return;
+    card.addEventListener('dragenter', handleDragEnter);
+    card.addEventListener('dragover', handleDragOver);
+    card.addEventListener('drop', handleDrop);
+    return function() {
+      card.removeEventListener('dragenter', handleDragEnter);
+      card.removeEventListener('dragover', handleDragOver);
+      card.removeEventListener('drop', handleDrop);
+    };
+  }, [sections]);
+
+  function insertSummaryContent(sectionIdx, payload) {
+    if (sectionIdx >= sections.length) return;
+    var targetSection = sections[sectionIdx];
+    var sectionId = payload.sectionId, label = payload.label || '', items = payload.items || [];
+    var newContent = '';
+
+    // Format section content
+    newContent += label + '\n';
+    if (items.length === 0) {
+      newContent += '• (aucun élément au dossier)\n';
+    } else {
+      items.forEach(function(item) {
+        var txt = summaryItemText(sectionId, item);
+        newContent += '• ' + txt + '\n';
+      });
+    }
+
+    // Append to existing content instead of replacing it
+    setSectionContent(targetSection.id, function(existing) {
+      var result = (existing || '').trim();
+      if (result) result += '\n\n';
+      result += newContent;
+      return result;
+    });
+  }
+
+  function summaryItemText(sectionId, item) {
+    if (!item) return '';
+    if (sectionId === 'allergies') return item.name || item.left || '';
+    if (sectionId === 'habits') return [item.name, item.detail].filter(Boolean).join(' : ');
+    var head = item.left || item.name || '';
+    var mid = item.mid || item.detail || '';
+    var right = item.right || item.date || '';
+    var s = head;
+    if (mid) s += ' ' + mid;
+    if (right) s += ' (' + right + ')';
+    return s.trim();
+  }
+
   // ----- drag-to-place helpers -----
   function combinedSection(sectionId) {
     if (toolLoc === sectionId) {
@@ -470,7 +559,69 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
     setInlineEdit(null);
   }
 
-  function handleComplete() {
+  // Build the list of sendable documents (prescriptions, requests, patient
+  // instructions) actually present in the note, grouped by destination.
+  // Mirrors the chip-count scan: only chips whose {{CHIP:id}} marker is still
+  // in the content are included (orphans left in the `chips` map are skipped).
+  function buildCheckoutGroups() {
+    var blob = sections.map(function(s) { return s.content || ''; }).join('\n');
+    Object.keys(sectionSplits).forEach(function(k) {
+      var sp = sectionSplits[k] || {};
+      blob += '\n' + (sp.top || '') + '\n' + (sp.bot || '');
+    });
+    var order = [], seen = {}, re = /\{\{CHIP:([^}]+)\}\}/g, m;
+    while ((m = re.exec(blob))) { if (!seen[m[1]]) { seen[m[1]] = true; order.push(m[1]); } }
+    var ents = order
+      .map(function(id) { return { id: id, entity: (chips[id] || {}).entity }; })
+      .filter(function(x) { return x.entity; });
+
+    function mk(e) {
+      var ent = e.entity, d = ent.details || {}, t = ent.type, label = ent.label, sub = '';
+      if (t === 'prescription') {
+        label = [d.molecule, d.dose ? d.dose + ' ' + (d.unit || '') : ''].filter(Boolean).join(' ').trim()
+          || (ent.rx && ent.rx.name) || ent.label;
+        sub = (ent.rx && ent.rx.sig)
+          || [d.route, d.frequency, d.duration ? '× ' + d.duration + ' ' + (d.durationUnit || 'jours') : ''].filter(Boolean).join(' ');
+      } else if (t === 'lab') {
+        label = (d.tests && d.tests.length) ? d.tests.join(', ') : (ent.label || 'Demande de laboratoire');
+        sub = [d.priority, d.fasting ? 'à jeun' : ''].filter(Boolean).join(' · ');
+      } else if (t === 'imaging') {
+        label = [d.modality, d.region].filter(Boolean).join(' ') || ent.label;
+        sub = [d.views, d.priority, (d.contrast && d.contrast !== 'Sans') ? 'avec contraste' : ''].filter(Boolean).join(' · ');
+      } else if (t === 'referral') {
+        label = d.specialty || ent.label;
+        sub = [d.priority, d.question].filter(Boolean).join(' · ');
+      } else if (t === 'instructions') {
+        label = d.title || ent.label || 'Consignes au patient';
+      }
+      return { id: e.id, type: t, label: label, sub: sub };
+    }
+    function byType(tp) {
+      return ents.filter(function(e) { return e.entity.type === tp; }).map(mk);
+    }
+
+    return [
+      { key: 'pharmacie',   types: ['prescription'] },
+      { key: 'laboratoire', types: ['lab'] },
+      { key: 'imagerie',    types: ['imaging'] },
+      { key: 'specialiste', types: ['referral'] },
+      { key: 'patient',     types: ['instructions'] },
+    ].map(function(g) {
+      var items = [];
+      g.types.forEach(function(tp) { items = items.concat(byType(tp)); });
+      return { key: g.key, items: items };
+    }).filter(function(g) { return g.items.length > 0; });
+  }
+
+  // « Compléter » ouvre d'abord la fenêtre d'envoi (checkout).
+  function openCheckout() {
+    setCheckoutGroups(buildCheckoutGroups());
+    setCheckoutOpen(true);
+  }
+
+  // Finalisation réelle, déclenchée par la confirmation du checkout :
+  // la note est sauvée et envoyée dans la liste.
+  function finalizeComplete() {
     var data = {
       raison: raison,
       date: noteDate,
@@ -486,7 +637,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
   }
 
   React.useEffect(function() {
-    if (completeRef) completeRef.current = handleComplete;
+    if (completeRef) completeRef.current = openCheckout;
   });
 
   // ----- build interleaved items list -----
@@ -498,7 +649,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
   }
 
   return (
-    <div style={neStyles.card}>
+    <div ref={noteCardRef} style={neStyles.card}>
       <div style={neStyles.topRow}>
         <div>
           <div style={neStyles.overline}>CLINIQUE DU CENTRE VILLE</div>
@@ -741,7 +892,22 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive }) {
         <ClinicalToolPicker
           anchorRect={pickerAnchor}
           onClose={function() { setPickerOpen(false); }}
+          onBack={function() {
+            setPickerOpen(false);
+            window.dispatchEvent(new CustomEvent('ct-addmenu-open', { detail: { id: pickerSourceId } }));
+          }}
           onSelect={handleToolSelect} />
+      }
+
+      {/* Checkout / envoi modal */}
+      {checkoutOpen &&
+        <CheckoutModal
+          groups={checkoutGroups}
+          doctorName={doctorName}
+          institution={institution}
+          note={{ title: (raison && raison.trim()) || 'Note clinique', date: noteDate, time: noteTime, visitType: visitType }}
+          onCancel={function() { setCheckoutOpen(false); }}
+          onConfirm={function() { setCheckoutOpen(false); finalizeComplete(); }} />
       }
 
       {/* Chip popover */}
@@ -1002,7 +1168,7 @@ function FloatField({ label, children, width, flex, error, input, type, select, 
     <div style={{
       ...neFieldStyles.wrap,
       ...(flex ? { flex: 1, minWidth: 200 } : { width }),
-      ...(error ? { borderColor: '#d32f2f' } : {}),
+      ...(error ? { border: '1px solid #d32f2f' } : {}),
       ...(isBuiltIn && focused ? neFieldStyles.wrapFocused : {})
     }}>
       {label &&
@@ -1039,7 +1205,7 @@ function FloatField({ label, children, width, flex, error, input, type, select, 
 
 const neFieldStyles = {
   wrap: { position: 'relative', border: '1px solid #c4c4c4', borderRadius: 6, height: 52, display: 'flex', alignItems: 'center', padding: '0 14px', background: '#fff' },
-  wrapFocused: { borderColor: '#6967d1', boxShadow: '0 0 0 1px #6967d1' },
+  wrapFocused: { border: '1px solid #6967d1', boxShadow: '0 0 0 1px #6967d1' },
   label: { position: 'absolute', left: 12, padding: '0 5px', background: '#fff', color: 'rgba(0,0,0,0.6)', fontFamily: "'Inter', sans-serif", pointerEvents: 'none', transformOrigin: 'left center', transition: 'top 0.16s ease, font-size 0.16s ease, color 0.16s ease' },
   labelFloating: { top: -8, fontSize: 12 },
   labelResting: { top: 15, fontSize: 16, color: 'rgba(0,0,0,0.55)' },
@@ -1171,7 +1337,7 @@ function TagInput({ tags, onChange }) {
 const tagStyles = {
   row: { marginTop: -6, marginBottom: 22 },
   wrap: { position: 'relative', border: '1px solid #c4c4c4', borderRadius: 6, minHeight: 52, display: 'flex', alignItems: 'center', padding: '7px 12px', background: '#fff' },
-  wrapFocused: { borderColor: '#6967d1', boxShadow: '0 0 0 1px #6967d1' },
+  wrapFocused: { border: '1px solid #6967d1', boxShadow: '0 0 0 1px #6967d1' },
   inner: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, width: '100%' },
   icon: { fontSize: 22, color: 'rgba(0,0,0,0.45)', marginRight: 2 },
   chip: { display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid #d2d2dd', borderRadius: 6, padding: '4px 4px 4px 12px', font: "500 14px 'Inter', sans-serif", color: 'rgba(0,0,0,0.82)', background: '#fff' },

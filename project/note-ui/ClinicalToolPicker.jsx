@@ -24,7 +24,7 @@ const CLINICAL_TOOLS = [
   { id: 'nicotine', label: 'Traitement de remplacement de la nicotine' },
 ];
 
-function ClinicalToolPicker({ anchorRect, onClose, onSelect }) {
+function ClinicalToolPicker({ anchorRect, onClose, onSelect, onBack }) {
   const [query, setQuery] = React.useState('');
   const [tab, setTab] = React.useState('all');
   const DEFAULT_FAVORITES = ['itu', 'ep-gabarit', 'em-gabarit', 'douleur-thoracique', 'prevention'];
@@ -100,7 +100,7 @@ function ClinicalToolPicker({ anchorRect, onClose, onSelect }) {
 
       {/* Header */}
       <div style={ctpS.header}>
-        <button style={ctpS.iconBtn} onClick={onClose} title="Fermer">
+        <button style={ctpS.iconBtn} onClick={onBack || onClose} title="Retour">
           <span className="material-icons-outlined" style={{ fontSize: 20 }}>arrow_back</span>
         </button>
         <span style={ctpS.title}>Outils cliniques</span>
