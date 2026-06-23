@@ -16,7 +16,7 @@ function PatientBanner({ forceCollapsed }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const stickyWrap = { position: 'sticky', top: 8, zIndex: 20, marginBottom: 12 };
+  const stickyWrap = { position: 'sticky', top: 8, marginBottom: 12 };
 
   /* ── Collapsed row ── */
   if (phase === 'collapsed') {
