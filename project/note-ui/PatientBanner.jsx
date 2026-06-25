@@ -16,9 +16,13 @@ function PatientBanner({ forceCollapsed }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // La bannière est épinglée hors du conteneur défilant (.center-col) : un
-  // z-index normal la place au-dessus du contenu de la note et sous les scrims.
-  const stickyWrap = { position: 'relative', zIndex: 10 };
+  // Bannière épinglée hors du conteneur défilant (.center-col). PAS de z-index
+  // positif : les scrims modaux sont piégés dans l'aside Summary (position:
+  // sticky → contexte d'empilement), donc tout z-index positif ici passerait
+  // AU-DESSUS du scrim. Sans z-index, la bannière reste au niveau de l'aside
+  // (qui la suit dans le DOM et la recouvre quand un scrim s'ouvre) tout en
+  // restant au-dessus du contenu de la note (région distincte, hors scroll).
+  const stickyWrap = { position: 'relative' };
 
   /* ── Collapsed row ── */
   if (phase === 'collapsed') {

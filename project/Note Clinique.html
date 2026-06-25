@@ -109,7 +109,10 @@
     padding: 10px 20px;
     background: #fff;
     border-top: 1px solid #e5e5ec;
-    z-index: 10;
+    /* Pas de z-index : sticky crée déjà son propre contexte d'empilement et,
+       étant le dernier enfant, il couvre le contenu qui défile dessous. Un
+       z-index positif le ferait passer au-dessus des scrims modaux (piégés
+       dans l'aside Summary en position:sticky). */
     min-height: 64px;
     margin-top: auto;
     box-shadow: 0 -4px 12px rgba(37,36,94,0.08);
