@@ -52,14 +52,26 @@
     background: #f4f5f7;
     align-items: stretch;
   }
-  .center-col {
+  /* Colonne centrale : bannière patient épinglée + zone défilante.
+     La bannière vit HORS du conteneur scrollable pour éviter le bug de
+     compositing (sticky + z-index dans overflow:auto passe au-dessus des
+     scrims fixes). Hors-scroll, un z-index normal suffit : au-dessus du
+     contenu, sous les scrims. */
+  .center-wrap {
     flex: 1;
     min-width: 520px;
     display: flex;
     flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+  }
+  .center-col {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
     gap: 16px;
     overflow-y: auto;
-    height: 100%;
     padding-right: 8px;
   }
   /* Note expansion animation */
@@ -226,8 +238,9 @@ function App() {
       <div className="main-row">
         <SideNav />
         <div className="content">
+          <div className="center-wrap">
+          <PatientBanner forceCollapsed={bannerCollapsed} />
           <div className="center-col" style={{ padding: "0px 8px 0px 0px" }}>
-            <PatientBanner forceCollapsed={bannerCollapsed} />
             <NoteEditor
               isOpen={noteOpen}
               onOpen={handleNoteOpen}
@@ -287,6 +300,7 @@ function App() {
                 onClick={() => { if (noteCompleteRef.current) noteCompleteRef.current(); }}>Compléter</button>
             </div>
             }
+          </div>
           </div>
           <Summary />
         </div>

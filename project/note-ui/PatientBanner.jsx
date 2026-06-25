@@ -16,7 +16,9 @@ function PatientBanner({ forceCollapsed }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const stickyWrap = { position: 'sticky', top: 8, marginBottom: 12 };
+  // La bannière est épinglée hors du conteneur défilant (.center-col) : un
+  // z-index normal la place au-dessus du contenu de la note et sous les scrims.
+  const stickyWrap = { position: 'relative', zIndex: 10 };
 
   /* ── Collapsed row ── */
   if (phase === 'collapsed') {
