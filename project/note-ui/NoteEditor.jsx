@@ -28,7 +28,8 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doct
     function() { return DEFAULT_SECTIONS.map(function(s) { return Object.assign({}, s); }); }
   );
   // Position de la zone d'outils entre les sections (0 = avant tout, 1 = entre s[0] et s[1], ...)
-  const [toolZoneIndex, setToolZoneIndex] = React.useState(1);
+  // Par défaut placée AVANT la section « Détails de la consultation ».
+  const [toolZoneIndex, setToolZoneIndex] = React.useState(0);
 
   // splits pour drag-to-place: { [sectionId]: { top: '', bot: '' } }
   const [sectionSplits, setSectionSplits] = React.useState({});
@@ -141,8 +142,11 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doct
     var d = entity.details || {};
     if (entity.type === 'prescription') {
       var head = [d.molecule, d.dose ? d.dose + ' ' + d.unit : ''].filter(Boolean).join(' ');
-      var qty = d.form === 'comprimé' ? '1 co' : d.form === 'aérosol-doseur' ? '2 inh' : '1 dose';
-      var tail = [qty, d.route, d.frequency, d.duration ? '× ' + d.duration + ' ' + (d.durationUnit || 'jours') : ''].filter(Boolean).join(' ');
+      var _n = (d.qtyDose && /^\d/.test(String(d.qtyDose))) ? String(d.qtyDose) : (d.form === 'aérosol-doseur' ? '2' : '1');
+      var _ab = d.form === 'comprimé' ? 'comp.' : d.form === 'aérosol-doseur' ? 'inh' : d.form === 'gélule' ? 'gél' : d.form === 'capsule' ? 'caps.' : 'dose';
+      var qty = _n + ' ' + _ab;
+      var _rf = (d.refills === undefined || d.refills === null || String(d.refills) === '') ? '0' : d.refills;
+      var tail = [qty, d.route, d.frequency + (d.prn && !/prn/i.test(d.frequency || '') ? ' PRN' : ''), d.duration ? '× ' + d.duration + ' ' + (d.durationUnit || 'jours') : '', 'R' + _rf].filter(Boolean).join(' ');
       return [head, tail].filter(Boolean).join(' — ') || entity.label;
     }
     if (entity.type === 'lab') return d.tests && d.tests[0] ? d.tests.join(', ').slice(0, 40) : entity.label;
@@ -638,6 +642,10 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doct
 
   React.useEffect(function() {
     if (completeRef) completeRef.current = openCheckout;
+    // « Prescrire » / « Transmettre » sur un chip ouvre le flux d'envoi (checkout).
+    function onOpenCheckout() { openCheckout(); }
+    window.addEventListener('note:open-checkout', onOpenCheckout);
+    return function() { window.removeEventListener('note:open-checkout', onOpenCheckout); };
   });
 
   // ----- build interleaved items list -----

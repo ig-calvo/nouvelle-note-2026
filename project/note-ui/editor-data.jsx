@@ -340,15 +340,23 @@ const RX_ITEMS = [
 
 function _cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
+// Nombre d'unités par prise (modale « Dose ») + abréviation de forme → « 2 comp. »
+function _rxQty(d) {
+  const n = (d.qtyDose && /^\d/.test(String(d.qtyDose))) ? String(d.qtyDose) : (d.form === 'aérosol-doseur' ? '2' : '1');
+  const ab = d.form === 'comprimé' ? 'comp.' : d.form === 'aérosol-doseur' ? 'inh' : d.form === 'gélule' ? 'gél' : d.form === 'capsule' ? 'caps.' : 'dose';
+  return n + ' ' + ab;
+}
+function _rxFreq(d) {
+  return (d.frequency || '') + (d.prn && !/prn/i.test(d.frequency || '') ? ' PRN' : '');
+}
 function deriveRxSig(d) {
-  const qty = d.form === 'comprimé' ? '1 comp.' : d.form === 'aérosol-doseur' ? '2 inh' : '1 dose';
   const dur = d.duration && d.duration !== '—'
     ? d.duration + (d.durationUnit === 'jours' || !d.durationUnit ? 'j' : ' ' + d.durationUnit)
     : '';
-  return [qty, d.route, d.frequency,
+  return [_rxQty(d), d.route, _rxFreq(d),
     d.quantity && /^\d+$/.test(d.quantity) ? '#' + d.quantity : '',
     dur,
-    d.refills !== '' && d.refills != null ? 'R' + d.refills : '']
+    'R' + ((d.refills === undefined || d.refills === null || String(d.refills) === '') ? '0' : d.refills)]
     .filter(Boolean).join(' ');
 }
 
@@ -377,13 +385,13 @@ const RX_ALL = RX_ITEMS.concat(RX_OTHERS);
 // Affichées en tête du menu /rx pour renouvellement / référence.
 const PATIENT_MEDS = [
   { key: 'med-contraceptif', name: 'Contraceptif oral', dose: '', med: true, medStatus: 'active', medStatusLabel: 'actif',
-    sig: '1 co PO DIE — actif',
+    sig: '1 co PO DIE',
     chipSig: '1 co PO DIE',
     details: { molecule: 'Contraceptif oral', dose: '', unit: '', form: 'comprimé', route: 'PO',
       frequency: 'DIE', duration: '', durationUnit: '', quantity: '', refills: '11',
       indication: 'Contraception', notes: 'Profil actif au dossier.' } },
   { key: 'med-nitrofurantoine', name: 'Nitrofurantoïne', dose: '100 mg', med: true, medStatus: 'cessée', medStatusLabel: 'cessée (ITU)',
-    sig: '1 co PO BID — cessée 12/2025',
+    sig: '1 co PO BID',
     chipSig: '1 co PO BID',
     details: { molecule: 'Nitrofurantoïne', dose: '100', unit: 'mg', form: 'comprimé', route: 'PO',
       frequency: 'BID', duration: '5', durationUnit: 'jours', quantity: '10', refills: '0',

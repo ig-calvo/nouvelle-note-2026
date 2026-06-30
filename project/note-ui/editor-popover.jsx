@@ -16,6 +16,7 @@ const rxS = {
   molName: { font: "500 15px 'Poppins', sans-serif", color: '#232428', whiteSpace: 'nowrap' },
   ramq: { display: 'inline-flex', alignItems: 'center', gap: 3, font: "500 12px 'Inter', sans-serif", color: '#484c51', whiteSpace: 'nowrap' },
   alertChip: { display: 'inline-flex', alignItems: 'center', gap: 4, border: '1px solid #c3ccd5', borderRadius: 8, padding: '4px 8px', flexShrink: 0 },
+  alertBand: { display: 'flex', alignItems: 'center', gap: 10, margin: '12px 18px 0', padding: '8px 14px', background: '#f8f7fd', border: '1px solid #c3ccd5', borderRadius: 8 },
   closeBtn: { width: 36, height: 36, border: 0, background: 'transparent', borderRadius: 8, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#484c51', flexShrink: 0 },
   body: { padding: '16px 18px 4px', overflowY: 'auto', flex: '1 1 auto', minHeight: 0 },
   sec: { font: "700 11px 'Inter', sans-serif", letterSpacing: '0.7px', textTransform: 'uppercase', color: '#2e38a6', margin: '6px 0 16px' },
@@ -34,7 +35,7 @@ function _rxOpts(list, val) {
   const v = (val == null ? '' : String(val));
   return (v && list.indexOf(v) === -1) ? [v].concat(list) : list;
 }
-function RxFF({ label, required, value, onChange, placeholder, flex, width }) {
+function RxFF({ label, required, value, onChange, placeholder, flex, width, suffix }) {
   const [foc, setFoc] = useStateP(false);
   return (
     <div style={Object.assign({}, rxS.fieldWrap, foc ? { borderColor: '#2e38a6' } : {}, width ? { width: width, flex: '0 0 auto' } : { flex: flex || 1 })}>
@@ -42,6 +43,7 @@ function RxFF({ label, required, value, onChange, placeholder, flex, width }) {
       <input style={rxS.input} value={value == null ? '' : value} placeholder={placeholder || ''}
         onFocus={() => setFoc(true)} onBlur={() => setFoc(false)}
         onChange={(e) => onChange && onChange(e.target.value)} />
+      {suffix ? <span style={{ padding: '0 12px 0 2px', font: "400 14px 'Inter',sans-serif", color: '#484c51', whiteSpace: 'nowrap', flexShrink: 0 }}>{suffix}</span> : null}
     </div>
   );
 }
@@ -67,6 +69,27 @@ function RxSwitch({ on, onToggle }) {
       style={{ width: 44, height: 24, borderRadius: 12, border: 0, background: on ? '#2e38a6' : '#c3ccd5', position: 'relative', cursor: 'pointer', flexShrink: 0, transition: 'background 120ms' }}>
       <span style={{ position: 'absolute', top: 2, left: on ? 22 : 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 120ms', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
     </button>
+  );
+}
+// Sélecteur de source/substitution (3 icônes) — d'après Figma
+function RxSourceToggle({ value, onChange }) {
+  const opts = [
+    { k: 'sub', icon: 'check', title: 'Substitution permise' },
+    { k: 'profile', icon: 'inventory_2', title: 'Au dossier pharmacologique' },
+    { k: 'manual', icon: 'edit', title: 'Saisie manuelle' },
+  ];
+  return (
+    <div style={{ display: 'inline-flex', flexShrink: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid #c3ccd5' }}>
+      {opts.map((o, i) => {
+        const on = value === o.k;
+        return (
+          <button key={o.k} type="button" title={o.title} onClick={() => onChange && onChange(o.k)}
+            style={{ width: 42, height: 40, border: 0, borderLeft: i ? '1px solid #c3ccd5' : '0', background: on ? '#dedbef' : '#fff', color: on ? '#3a3167' : '#6b6f76', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span className="material-icons-outlined" style={{ fontSize: 20 }}>{o.icon}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -97,25 +120,33 @@ function ChipPopover({ chip, anchorRect, onClose, onSave, onRevert, onDelete }) 
         <div style={rxS.head}>
           <span style={rxS.rxIcon}>℞</span>
           <span style={rxS.molName}>{d.molecule || 'Prescription'}</span>
-          <span style={rxS.ramq}>RAMQ <span className="material-icons-outlined" style={{ fontSize: 16, color: '#cc3340' }}>do_not_disturb_on</span></span>
           <span style={{ flex: 1 }} />
-          <span style={rxS.alertChip}>
-            <span className="material-icons-outlined" style={{ fontSize: 18, color: '#484c51' }}>medication</span>
-            <span className="material-icons-outlined" style={{ fontSize: 18, color: '#b88114' }}>warning</span>
-          </span>
           <button style={rxS.closeBtn} onClick={onClose}><span className="material-icons-outlined">close</span></button>
+        </div>
+        <div style={rxS.alertBand}>
+          <span className="material-icons-outlined" style={{ fontSize: 20, color: '#39604d', flexShrink: 0 }}>verified_user</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+            <span style={{ font: "500 14px 'Inter',sans-serif", color: '#232428' }}>Aucune alerte</span>
+            <span style={{ font: "400 12px 'Inter',sans-serif", color: '#6b6f76' }}>Créatinine sérique : N/A&nbsp;&nbsp;·&nbsp;&nbsp;eGFR : N/A&nbsp;&nbsp;·&nbsp;&nbsp;Poids : N/A</span>
+          </div>
         </div>
         <div style={rxS.body}>
           <div style={rxS.sec}>Médicament et posologie</div>
           <div style={rxS.row}>
-            <RxFF label="Produit" value={d.molecule} onChange={(v) => up('molecule', v)} />
-            <RxFF label="Force et forme" value={d.form} onChange={(v) => up('form', v)} />
-            <RxSwitch on={!!d.noSubstitution} onToggle={() => up('noSubstitution', !d.noSubstitution)} />
+            <RxFF label="Produit" value={d.molecule} onChange={(v) => up('molecule', v)} flex={2} />
+            <span style={rxS.ramq}>RAMQ <span className="material-icons-outlined" style={{ fontSize: 16, color: '#cc3340' }}>do_not_disturb_on</span></span>
+            <RxSourceToggle value={d.source || 'sub'} onChange={(v) => up('source', v)} />
           </div>
           <div style={rxS.row}>
-            <RxFF label="Dose" required value={d.dose} onChange={(v) => up('dose', v)} flex={1.35} />
-            <RxSel label="Voie" required value={d.route} onChange={(v) => up('route', v)} options={['PO', 'IM', 'IV', 'SC', 'Inhalé', 'SL', 'Top.', 'Rect.']} flex={1.35} />
-            <RxSel label="Fréquence" required value={d.frequency} onChange={(v) => up('frequency', v)} options={['DIE', 'BID', 'TID', 'QID', 'HS', 'q4-6h PRN', 'QID PRN', 'AC', 'PC']} flex={1.85} />
+            <RxFF label="Dose visée" required value={d.dose} onChange={(v) => up('dose', v)} suffix={d.unit || 'mg'} flex={1.2} />
+            <span className="material-icons-outlined" style={{ color: '#6b6f76', fontSize: 22, flexShrink: 0 }}>link</span>
+            <RxFF label="Dose" value={d.qtyDose} onChange={(v) => up('qtyDose', v)} placeholder="1" flex={0.9} />
+            <RxFF label="Forme et teneur" value={d.formeTeneur != null ? d.formeTeneur : (d.form || '')} onChange={(v) => up('formeTeneur', v)} flex={1.9} />
+          </div>
+          <div style={rxS.row}>
+            <RxSel label="Voie" required value={d.route} onChange={(v) => up('route', v)} options={['PO', 'IM', 'IV', 'SC', 'Inhalé', 'SL', 'Top.', 'Rect.']} flex={1.2} />
+            <RxSel label="Site" value={d.site} onChange={(v) => up('site', v)} options={['—', 'Deltoïde G', 'Deltoïde D', 'Abdomen', 'Cuisse G', 'Cuisse D', 'Fessier']} placeholder="Site" flex={1.2} />
+            <RxSel label="Fréquence" required value={d.frequency} onChange={(v) => up('frequency', v)} options={['DIE', 'BID', 'TID', 'QID', 'HS', 'q4-6h PRN', 'QID PRN', 'AC', 'PC']} flex={1.6} />
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: "400 14px 'Inter',sans-serif", color: '#232428', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
               <input type="checkbox" checked={!!d.prn} onChange={(e) => up('prn', e.target.checked)} style={{ width: 18, height: 18, accentColor: '#2e38a6' }} />
               PRN
@@ -319,7 +350,7 @@ function AddMenu({ position, tools, orders, onPickTool, onPickOrder, onPickFile,
       <div className="addmenu-scrim" onMouseDown={(e) => { e.preventDefault(); onClose(); }} />
       <div className="addmenu" style={position} onMouseDown={stop}>
 
-        <div className="addmenu-sec">Ajouter</div>
+        <div className="addmenu-sec">RÉDACTION</div>
         <button className="addmenu-item" style={showFileSub ? { background: '#f5f5fa' } : {}}
           onMouseDown={(e) => { e.preventDefault(); setShowFileSub(s => !s); }}>
           <span className="material-icons-outlined ic">upload_file</span>
@@ -344,6 +375,11 @@ function AddMenu({ position, tools, orders, onPickTool, onPickOrder, onPickFile,
             </button>
           </div>
         )}
+        <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); }}>
+          <span className="material-icons-outlined ic">bolt</span>
+          <span className="lbl">Textes rapides</span>
+          <span className="kbd">Ctrl+R</span>
+        </button>
         <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); if (onAddSection) onAddSection(); onClose(); }}>
           <span className="material-icons-outlined ic">add</span>
           <span className="lbl">Ajouter une section</span>
@@ -359,12 +395,7 @@ function AddMenu({ position, tools, orders, onPickTool, onPickOrder, onPickFile,
 
         <div className="addmenu-div" />
 
-        <div className="addmenu-sec">Outils</div>
-        <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); }}>
-          <span className="material-icons-outlined ic">bolt</span>
-          <span className="lbl">Textes rapides</span>
-          <span className="kbd">Ctrl+R</span>
-        </button>
+        <div className="addmenu-sec">FONCTIONS</div>
         {diagnosticItem && (
           <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); if (onPickTool) onPickTool(diagnosticItem); onClose(); }}>
             <span className="material-symbols-outlined ic">{diagnosticItem.icon}</span>
@@ -389,6 +420,10 @@ function AddMenu({ position, tools, orders, onPickTool, onPickOrder, onPickFile,
           <span className="material-icons-outlined ic">handyman</span>
           <span className="lbl">Outils cliniques</span>
           <span className="material-icons-outlined arr">chevron_right</span>
+        </button>
+        <button className="addmenu-item" onMouseDown={(e) => { e.preventDefault(); if (onAddSection) onAddSection(); onClose(); }}>
+          <span className="material-icons-outlined ic">lock</span>
+          <span className="lbl">Note confidentielle</span>
         </button>
       </div>
     </>
@@ -440,7 +475,7 @@ function RxMenu({ position, kind, def, query, results, activeIndex, onSelect, on
         }
         {sections.map(([ttl, list]) => list.length === 0 ? null : (
           <div key={ttl} className="rx-sec-block">
-            <div className="rx-sec">{ttl}</div>
+            <div className="rx-sec">{ttl} <span className="rx-sec-count">({list.length})</span></div>
             {list.map((it) => {
               flat += 1;
               const idx = flat;
@@ -459,9 +494,8 @@ function RxMenu({ position, kind, def, query, results, activeIndex, onSelect, on
                   </div>
                   <div className="rx-item__actions">
                     {it.med
-                      ? <span title={it.medStatusLabel || ''} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: it.medStatus === 'active' ? '#1b8a3f' : '#c62828', whiteSpace: 'nowrap' }}>
-                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: it.medStatus === 'active' ? '#1b8a3f' : '#c62828' }} />
-                          {it.medStatusLabel}
+                      ? <span className={'rx-status ' + (it.medStatus === 'active' ? 'rx-status--active' : 'rx-status--ceased')} title={it.medStatusLabel || ''}>
+                          {it.medStatus === 'active' ? 'Actif' : 'Cessé'}
                         </span>
                       : <button type="button" className={'rx-heart' + (fav ? ' is-fav' : '')}
                           title={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}

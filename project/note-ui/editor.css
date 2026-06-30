@@ -182,43 +182,28 @@
 .chip .chip-icon { font-size: 14px !important; color: var(--brand-primary); }
 
 /* Inline order chip (℞/lab/img · Name dose · [detail box] · free text) */
-.chip--rx { background: #fff; border: 1px solid #b9b9d0; color: var(--fg-1); border-radius: 8px; padding: 3px 8px; gap: 7px; margin: 0 4px; font-weight: 500; box-shadow: 0 1px 2px rgba(37,36,94,0.06); }
+.chip--rx { background: #fff; border: 1px solid #c3ccd5; color: var(--fg-1); border-radius: 6px; padding: 2px 8px; gap: 6px; margin: 0 3px; font-weight: 500; box-shadow: 0 1px 2px rgba(37,36,94,0.05); }
 .chip--rx:hover { background: #f7f7fd; box-shadow: var(--elev-1); }
 .chip--rx.open { background: #f2f1fc; box-shadow: 0 0 0 2px rgba(46,56,166,0.14); }
 .chip--rx .chip-rx-icon { font-family: var(--font-display); font-weight: 700; font-size: 16px; color: #25245E; line-height: 1; }
 .chip--rx .chip-rx-glyph { font-size: 17px !important; line-height: 1; color: #25245E; }
 .chip--lab .chip-rx-glyph { color: #1975d1; }
 .chip--img .chip-rx-glyph { color: #7a3ec2; }
-.chip--rx .chip-rx-name { font-weight: 700; font-size: 14px; color: var(--fg-1); padding: 0 1px 0 2px; }
+.chip--rx .chip-rx-name { font-weight: 700; font-size: 14px; color: var(--fg-1); padding: 0 0 0 2px; }
+.chip--rx .chip-rx-head { display: inline; }
+/* La dose fait partie de l'en-tête « Nom dose » — cliquable pour édition inline */
+.chip--rx .chip-rx-dose { font-weight: 500; font-size: 14px; color: var(--fg-2); cursor: pointer; border-radius: 4px; padding: 1px 4px; transition: background 0.12s, color 0.12s, box-shadow 0.12s; }
 .chip--rx .chip-rx-dose:empty { display: none; }
-.chip--rx .chip-rx-sig { display: inline-block; vertical-align: baseline; font-weight: 600; font-size: 12px; color: var(--fg-2); background: #f0f0f7; border: 1px solid #e0e0ec; border-radius: 4px; padding: 1px 5px; margin-left: 3px; letter-spacing: 0.1px; }
+/* Posologie : texte continu lisible (gris). Chaque segment reste cliquable. */
+.chip--rx .chip-rx-poso,
+.chip--rx .chip-rx-sig { font-weight: 500; font-size: 13px; color: var(--fg-3); }
 .chip--rx .chip-rx-sig:empty { display: none; }
-/* Tokens de posologie cliquables — style unifié */
 .chip--rx .chip-rx-sep { display: none; }
-.chip--rx .chip-rx-dose,
-.chip--rx .chip-rx-form,
-.chip--rx .chip-rx-route,
-.chip--rx .chip-rx-freq,
-.chip--rx .chip-rx-dur {
-  display: inline-block;
-  vertical-align: baseline;
-  font-weight: 600;
-  font-size: 12px;
-  color: var(--fg-2);
-  background: #f0f0f7;
-  border: 1px solid #e0e0ec;
-  border-radius: 4px;
-  padding: 1px 5px;
-  margin-left: 3px;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
-  user-select: none;
-}
+.chip--rx .chip-rx-poso > span { border-radius: 4px; padding: 1px 4px; }
+.chip--rx .chip-rx-poso > span[data-field] { cursor: pointer; transition: background 0.12s, color 0.12s, box-shadow 0.12s; }
+/* Indice « éditable » : surbrillance claire au survol des segments cliquables */
 .chip--rx .chip-rx-dose:hover,
-.chip--rx .chip-rx-form:hover,
-.chip--rx .chip-rx-route:hover,
-.chip--rx .chip-rx-freq:hover,
-.chip--rx .chip-rx-dur:hover { background: #e4e2f7; border-color: #b9b5e0; color: #4840a8; }
+.chip--rx .chip-rx-poso > span[data-field]:hover { background: #ece9fb; color: #2e38a6; box-shadow: inset 0 0 0 1px #c9c0ef; }
 /* ℞ icon and lab/img/ref glyph open full modal on click */
 .chip--rx .chip-rx-icon { cursor: pointer; }
 .chip--rx .chip-rx-icon:hover { opacity: 0.75; }
@@ -231,14 +216,15 @@
 .chip--ref .chip-rx-glyph { color: #2e7d32; }
 
 /* Rx search dropdown (commande /rx) */
-.rx-menu { position: fixed; width: 400px; background: #fff; border: 1px solid #ececf2; border-radius: 12px; box-shadow: 0 14px 40px rgba(37,36,94,0.20); overflow: hidden; font-family: var(--font-body); animation: medmenu-in 140ms var(--motion-ease); display: flex; flex-direction: column; }
+.rx-menu { position: fixed; width: 460px; background: #fff; border: 1px solid #d0d5f0; border-radius: 10px; box-shadow: 0 0 8px rgba(37,36,94,0.12), 0 24px 24px -8px rgba(37,36,94,0.10); overflow: hidden; font-family: var(--font-body); animation: medmenu-in 140ms var(--motion-ease); display: flex; flex-direction: column; }
 .rx-menu__scroll { overflow-y: auto; max-height: 380px; padding-bottom: 6px; }
 .rx-sec { font-size: 13px; color: var(--fg-2); padding: 12px 16px 9px; border-bottom: 1px solid #eceaf4; margin-bottom: 4px; }
 .rx-sec-block + .rx-sec-block .rx-sec { margin-top: 6px; }
 .rx-item { display: flex; align-items: flex-start; gap: 12px; padding: 9px 16px; cursor: pointer; transition: background 110ms; }
 .rx-item.is-active { background: #eef1fb; }
 .rx-item__body { flex: 1; min-width: 0; }
-.rx-item__name { font-size: 15px; font-weight: 500; color: var(--fg-1); }
+.rx-item__name { font-size: 15px; font-weight: 600; color: var(--fg-1); }
+.rx-sec-count { color: var(--fg-3); font-weight: 500; }
 .rx-item__name .rx-match { color: var(--brand-primary); font-weight: 700; }
 .rx-item__sig { font-size: 13px; color: var(--fg-3); margin-top: 2px; line-height: 1.45; }
 .rx-item__actions { display: flex; align-items: center; gap: 8px; padding-top: 2px; flex-shrink: 0; }
@@ -246,6 +232,10 @@
 .rx-heart:hover { color: #e0245e; background: rgba(224,36,94,0.08); }
 .rx-heart .material-icons { font-size: 22px; }
 .rx-heart.is-fav { color: #e8112d; }
+/* Pastille de statut (médication au dossier) */
+.rx-status { display: inline-flex; align-items: center; font: 600 11px/16px var(--font-body); padding: 2px 8px; border-radius: 4px; white-space: nowrap; letter-spacing: 0.2px; }
+.rx-status--active { background: #e0ebe6; color: #39604d; }
+.rx-status--ceased { background: #ecdfe0; color: #7a1f26; }
 .rx-active { width: 22px; height: 22px; border-radius: 50%; background: #1975d1; color: #fff; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .rx-active .material-icons { font-size: 15px; }
 .rx-empty { padding: 18px 16px; font-size: 13px; color: var(--fg-3); }

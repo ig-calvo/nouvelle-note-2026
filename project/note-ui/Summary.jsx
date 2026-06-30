@@ -296,7 +296,16 @@ function SummaryRow({ r, sId }) {
   if (sId === 'meds') {
     var c = MEDS_STATUS_COLOR[r.status] || MEDS_STATUS_COLOR.active;
     return (
-      <div style={suS.row}>
+      <div style={{ ...suS.row, cursor:'grab' }}
+        draggable={true}
+        title="Glisser ce médicament vers la note"
+        onDragStart={function(e){
+          e.stopPropagation();
+          window.__omniSummaryDrag = { sectionId:'meds', label:'', items:[r], single:true };
+          try { e.dataTransfer.setData('text/omni-section', 'meds'); } catch(err){}
+          e.dataTransfer.effectAllowed = 'copy';
+        }}
+        onDragEnd={function(e){ if (e && e.stopPropagation) e.stopPropagation(); window.__omniSummaryDrag = null; }}>
         <span style={{ ...suS.dot, background:c }} />
         <span style={{ ...suS.rLeft, maxWidth:100 }}>{r.name}</span>
         {r.detail && <span style={suS.rMid}>{r.detail}</span>}

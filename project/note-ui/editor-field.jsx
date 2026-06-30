@@ -51,59 +51,62 @@ function newDiagId() {return 'd' + _diagSeq++;}
           ic.textContent = kind === 'lab' ? 'science' : kind === 'img' ? 'radiology' : kind === 'ref' ? 'person_add' : 'bookmark';
         }
         node.appendChild(ic);
-        const nm = document.createElement('span');
-        nm.className = 'chip-rx-name';
-        nm.textContent = data.rx.name || '';
-        node.appendChild(nm);
         if (kind === 'rx') {
-          const ds = document.createElement('span');
-          ds.className = 'chip-rx-dose';
-          ds.setAttribute('data-field', 'dose');
-          ds.textContent = data.rx.dose || '';
-          node.appendChild(ds);
-          // If structured details available, render split sig parts; otherwise fall back to sig string
+          // En-tête « Nom dose » — la dose est cliquable et fait partie du titre
+          const head = document.createElement('span');
+          head.className = 'chip-rx-head';
+          const nm = document.createElement('span');
+          nm.className = 'chip-rx-name';
+          nm.textContent = data.rx.name || '';
+          head.appendChild(nm);
+          if (data.rx.dose) {
+            const ds = document.createElement('span');
+            ds.className = 'chip-rx-dose';
+            ds.setAttribute('data-field', 'dose');
+            ds.textContent = data.rx.dose;
+            head.appendChild(document.createTextNode(' '));
+            head.appendChild(ds);
+          }
+          node.appendChild(head);
+          // Posologie en texte continu lisible : « 1 comp. PO DIE #30 30j R12 »
+          // Chaque segment reste cliquable (data-field) pour l'édition inline.
           if (d.frequency) {
-            const qty = d.form === 'comprimé' ? '1 co' : d.form === 'aérosol-doseur' ? '2 inh' : d.form === 'gélule' ? '1 gél' : '1 dose';
-            const fm = document.createElement('span');
-            fm.className = 'chip-rx-form';
-            fm.setAttribute('data-field', 'form');
-            fm.textContent = qty;
-            node.appendChild(fm);
-            const rt = document.createElement('span');
-            rt.className = 'chip-rx-route';
-            rt.setAttribute('data-field', 'route');
-            rt.textContent = d.route || '';
-            node.appendChild(rt);
-            const sep1 = document.createElement('span'); sep1.className = 'chip-rx-sep'; sep1.textContent = ' '; node.appendChild(sep1);
-            const freq = document.createElement('span');
-            freq.className = 'chip-rx-freq';
-            freq.setAttribute('data-field', 'frequency');
-            freq.textContent = d.frequency;
-            node.appendChild(freq);
-            // Durée et renouvellement : deux badges distincts, chacun éditable.
+            const poso = document.createElement('span');
+            poso.className = 'chip-rx-poso';
+            const seg = function (cls, field, text) {
+              const s = document.createElement('span');
+              s.className = cls;
+              if (field) s.setAttribute('data-field', field);
+              s.textContent = text;
+              return s;
+            };
+            const _n = (d.qtyDose && /^\d/.test(String(d.qtyDose))) ? String(d.qtyDose) : (d.form === 'aérosol-doseur' ? '2' : '1');
+            const _ab = d.form === 'comprimé' ? 'comp.' : d.form === 'aérosol-doseur' ? 'inh' : d.form === 'gélule' ? 'gél' : d.form === 'capsule' ? 'caps.' : 'dose';
+            const qty = _n + ' ' + _ab;
+            const freqTxt = (d.frequency || '') + (d.prn && !/prn/i.test(d.frequency || '') ? ' PRN' : '');
+            const tokens = [seg('chip-rx-form', 'form', qty)];
+            if (d.route) tokens.push(seg('chip-rx-route', 'route', d.route));
+            tokens.push(seg('chip-rx-freq', 'frequency', freqTxt));
+            if (d.quantity && /^\d+$/.test(String(d.quantity))) tokens.push(seg('chip-rx-qty', null, '#' + d.quantity));
             if (d.duration && d.duration !== '—') {
-              const sep2 = document.createElement('span'); sep2.className = 'chip-rx-sep'; sep2.textContent = ' '; node.appendChild(sep2);
-              const dur = document.createElement('span');
-              dur.className = 'chip-rx-dur';
-              dur.setAttribute('data-field', 'duration');
-              dur.textContent = '× ' + d.duration + ' ' + (d.durationUnit || 'jours');
-              node.appendChild(dur);
+              tokens.push(seg('chip-rx-dur', 'duration', d.duration + (d.durationUnit === 'jours' || !d.durationUnit ? 'j' : ' ' + d.durationUnit)));
             }
-            if (d.refills !== undefined && String(d.refills) !== '' && String(d.refills) !== '0') {
-              const sep3 = document.createElement('span'); sep3.className = 'chip-rx-sep'; sep3.textContent = ' '; node.appendChild(sep3);
-              const ref = document.createElement('span');
-              ref.className = 'chip-rx-dur';
-              ref.setAttribute('data-field', 'refills');
-              ref.textContent = 'R' + d.refills;
-              node.appendChild(ref);
-            }
-          } else {
+            // Toujours afficher le renouvellement (R0 si aucun) — la valeur reste éditable.
+            const _rf = (d.refills === undefined || d.refills === null || String(d.refills) === '') ? '0' : String(d.refills);
+            tokens.push(seg('chip-rx-dur', 'refills', 'R' + _rf));
+            tokens.forEach(function (t) { poso.appendChild(t); });
+            node.appendChild(poso);
+          } else if (data.rx.sig) {
             const sg = document.createElement('span');
-            sg.className = 'chip-rx-sig';
-            sg.textContent = data.rx.sig || '';
+            sg.className = 'chip-rx-poso';
+            sg.textContent = data.rx.sig;
             node.appendChild(sg);
           }
         } else {
+          const nm = document.createElement('span');
+          nm.className = 'chip-rx-name';
+          nm.textContent = data.rx.name || '';
+          node.appendChild(nm);
           // Lab / Img / Ref: clickable priority badge (+ optional extras)
           const pr = document.createElement('span');
           pr.className = 'chip-rx-badge';
@@ -473,6 +476,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
   const [diagRename, setDiagRename] = useStateE(null); // { id, value, pos:{top,left} } — diagnostic rename popover
   const [chipMenu, setChipMenu] = useStateE(null); // { cid, rect } — hover menu (Modifier / Supprimer) on order chips
   const [chipDelete, setChipDelete] = useStateE(null); // { cid, rect } — delete confirmation popover
+  const [chipMore, setChipMore] = useStateE(null); // { cid, rect } — sous-menu « ⋮ » du chip
   const chipMenuTimerRef = useRefE(null);
   const [dropCaret, setDropCaret] = useStateE(null); // { left, top, width } — barre de dépôt (horizontale) lors d'un glisser depuis le Sommaire
   const addBtnRef = useRefE(null);
@@ -795,6 +799,45 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
           return;
         }
       }
+
+      // --- Navigation inter-sections : ↑ sur la 1re ligne ou ↓ sur la dernière
+      //     ligne déplace le curseur vers la section voisine (si aucun menu ouvert).
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        const sel = q.getSelection();
+        if (sel && sel.length === 0) {
+          const lines = q.getLines(0);
+          const li = q.getLine(sel.index);
+          const curLine = li && li[0];
+          if (curLine) {
+            const lineIdx = lines.indexOf(curLine);
+            if (e.key === 'ArrowUp' && lineIdx <= 0) {
+              if (focusAdjacentField(-1)) e.preventDefault();
+            } else if (e.key === 'ArrowDown' && lineIdx >= lines.length - 1) {
+              if (focusAdjacentField(1)) e.preventDefault();
+            }
+          }
+        }
+      }
+    }
+
+    // Déplace le focus d'écriture vers la section voisine (dir −1 = amont, +1 = aval).
+    function focusAdjacentField(dir) {
+      const editors = Array.prototype.slice.call(document.querySelectorAll('.note-field .ql-editor'));
+      const i = editors.indexOf(q.root);
+      if (i < 0) return false;
+      const target = editors[i + dir];
+      if (!target) return false;
+      const host = target.closest('.note-field');
+      let tq = null;
+      try { tq = window.Quill.find(host); } catch (e2) {}
+      if (tq && tq.setSelection) {
+        tq.focus();
+        const at = dir > 0 ? 0 : Math.max(0, tq.getLength() - 1);
+        try { tq.setSelection(at, 0, 'user'); } catch (e3) {}
+      } else {
+        target.focus();
+      }
+      return true;
     }
   }, []);
 
@@ -1439,11 +1482,11 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
   function keepChipAsText(cid) { applyChipEdit(cid, chipPlainText(cid)); }
 
   useEffectE(function() {
-    if (!chipDelete && !chipMenu) return;
-    function onKey(e) { if (e.key === 'Escape') { setChipDelete(null); setChipMenu(null); } }
+    if (!chipDelete && !chipMenu && !chipMore) return;
+    function onKey(e) { if (e.key === 'Escape') { setChipDelete(null); setChipMenu(null); setChipMore(null); } }
     document.addEventListener('keydown', onKey);
     return function() { document.removeEventListener('keydown', onKey); };
-  }, [chipDelete, chipMenu]);
+  }, [chipDelete, chipMenu, chipMore]);
 
   // ---------------------------------------------------------
   // Glisser-déposer d'une section du Sommaire dans la note
@@ -1508,19 +1551,22 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
   function insertSummarySection(index, payload) {
     const q = quillRef.current; if (!q || !payload) return;
     const sectionId = payload.sectionId, label = payload.label || '', items = payload.items || [];
+    const single = !!payload.single;
     silentRef.current = true;
     let at = index;
     if (at > 0 && q.getText(at - 1, 1) !== '\n') { q.insertText(at, '\n', 'silent'); at += 1; }
-    q.insertText(at, label, 'silent'); at += label.length;
-    q.insertText(at, '\n', 'silent'); at += 1;
+    if (label) {
+      q.insertText(at, label, 'silent'); at += label.length;
+      q.insertText(at, '\n', 'silent'); at += 1;
+    }
     const added = [];
-    if (items.length === 0) {
+    if (!single && items.length === 0) {
       const empty = '• (aucun élément au dossier)';
       q.insertText(at, empty, 'silent'); at += empty.length;
       q.insertText(at, '\n', 'silent'); at += 1;
     }
     items.forEach(function(item) {
-      q.insertText(at, '• ', 'silent'); at += 2;
+      if (!single) { q.insertText(at, '• ', 'silent'); at += 2; }
       if (sectionId === 'meds') {
         const cid = newChipId();
         const name = (item.name || '').replace(/[…\.]+$/, '').trim() || 'Médicament';
@@ -1692,7 +1738,9 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         const r = chipMenu.rect;
         const placeBelow = r.top < 56;
         const top = placeBelow ? r.bottom + 8 : r.top - 48;
-        const left = Math.max(8, Math.min(r.left, window.innerWidth - 180));
+        const left = Math.max(8, Math.min(r.left, window.innerWidth - 260));
+        const _ent = chips[chipMenu.cid] && chips[chipMenu.cid].entity;
+        const _isRx = !_ent || _ent.type === 'prescription';
         return (
           <div
             style={Object.assign({ position: 'fixed', top: top, left: left, zIndex: 200 }, cmS.bar)}
@@ -1710,11 +1758,25 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
               Modifier
             </button>
             <button
-              style={cmS.segEnd}
-              title="Supprimer"
+              style={cmS.segMid}
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { cancelChipMenuClose(); setChipDelete({ cid: chipMenu.cid, rect: chipMenu.rect }); setChipMenu(null); }}>
-              <span className="material-icons-outlined" style={{ fontSize: 20, color: '#ba1a1a' }}>delete</span>
+              onClick={() => {
+                const cid = chipMenu.cid;
+                setChipMenu(null);
+                // Ouvre le flux d'envoi (checkout) — document + prescrit/transmis.
+                window.dispatchEvent(new CustomEvent('note:open-checkout', { detail: { cid: cid, kind: _isRx ? 'rx' : 'order' } }));
+              }}>
+              {_isRx
+                ? <span style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: 18, lineHeight: 1 }}>℞</span>
+                : <span className="material-icons-outlined" style={{ fontSize: 20 }}>send</span>}
+              {_isRx ? 'Prescrire' : 'Transmettre'}
+            </button>
+            <button
+              style={cmS.segEnd}
+              title="Plus d'options"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { cancelChipMenuClose(); setChipMore({ cid: chipMenu.cid, rect: chipMenu.rect }); setChipMenu(null); }}>
+              <span className="material-icons-outlined" style={{ fontSize: 20, color: '#303336' }}>more_vert</span>
             </button>
           </div>
         );
@@ -1756,6 +1818,32 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         );
       })()}
 
+      {/* Sous-menu « ⋮ » du chip — options secondaires */}
+      {chipMore && (function() {
+        const r = chipMore.rect;
+        const W = 220;
+        const top = r.bottom + 8;
+        const left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8));
+        const item = { display: 'flex', alignItems: 'center', gap: 10, width: '100%', border: 0, background: 'transparent', borderRadius: 8, padding: '9px 12px', cursor: 'pointer', font: "500 14px 'Inter',sans-serif", color: '#303336', textAlign: 'left' };
+        return (
+          <React.Fragment>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 209 }} onMouseDown={() => setChipMore(null)} />
+            <div style={{ position: 'fixed', top: top, left: left, width: W, zIndex: 210, background: '#fff', border: '1px solid #e2e2ec', borderRadius: 10, boxShadow: '0 14px 40px rgba(37,36,94,0.22)', padding: 6, fontFamily: "'Inter',sans-serif", animation: 'pop-in 130ms ease-out' }}>
+              <button style={item} onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4fb'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                onClick={() => { keepChipAsText(chipMore.cid); setChipMore(null); }}>
+                <span className="material-icons-outlined" style={{ fontSize: 20, color: '#5b5f66' }}>notes</span>
+                Convertir en texte
+              </button>
+              <button style={Object.assign({}, item, { color: '#ba1a1a' })} onMouseEnter={(e) => e.currentTarget.style.background = '#fdecec'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                onClick={() => { deleteChipFromMenu(chipMore.cid); setChipMore(null); }}>
+                <span className="material-icons-outlined" style={{ fontSize: 20, color: '#ba1a1a' }}>delete</span>
+                Supprimer
+              </button>
+            </div>
+          </React.Fragment>
+        );
+      })()}
+
       {/* Ligne de dépôt (horizontale, pleine largeur) lors d'un glisser depuis le Sommaire */}
       {dropCaret &&
         <div style={{
@@ -1787,6 +1875,13 @@ const cmS = {
     display: 'inline-flex', alignItems: 'center', gap: 8,
     height: 40, padding: '0 14px', boxSizing: 'border-box',
     border: '1px solid #c3ccd5', borderRadius: '8px 0 0 8px',
+    background: '#fff', cursor: 'pointer',
+    font: "500 14px 'Inter',sans-serif", color: '#303336', letterSpacing: 0.25,
+  },
+  segMid: {
+    display: 'inline-flex', alignItems: 'center', gap: 8,
+    height: 40, padding: '0 14px', marginLeft: -1, boxSizing: 'border-box',
+    border: '1px solid #c3ccd5', borderRadius: 0,
     background: '#fff', cursor: 'pointer',
     font: "500 14px 'Inter',sans-serif", color: '#303336', letterSpacing: 0.25,
   },
