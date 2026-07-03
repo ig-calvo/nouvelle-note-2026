@@ -18,12 +18,19 @@ function scanDiagNames(sections) {
   return out;
 }
 
-function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doctorName, institution, showClinicalTools = true }) {
+function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doctorName, institution, showClinicalTools = true,
+  startPoints = false, lastNote, onLinkEpisode, onDraftSaved, onSmartPick, saveDraftRef }) {
   // Lu par editor-field.jsx (filterSlash) pour retirer l'entrée "Outils
   // cliniques" du menu slash sans faire dépendre editor-data.jsx d'une prop.
   React.useEffect(function() {
     window.__SHOW_CLINICAL_TOOLS = showClinicalTools;
   }, [showClinicalTools]);
+
+  // Brouillons sauvegardés (« Continuer la note ») et lien d'épisode de soin
+  // (« Depuis la dernière note ») — voir NoteStartCards.jsx pour l'UI et
+  // NotesList.jsx pour l'affichage de l'épisode dans la liste.
+  const [drafts, setDrafts] = React.useState([]);
+  const [episodeId, setEpisodeId] = React.useState(null);
 
   const DEFAULT_SECTIONS = [
     { id: 'sec-details',    title: 'Détails de la consultation', content: '' },
@@ -599,6 +606,52 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doct
     setToolOpen(false);
     setToolBodyCollapsed(false);
     setInlineEdit(null);
+    setEpisodeId(null);
+  }
+
+  // ----- Points de départ (tweak "Points de départ") -----
+  function startFromLast() {
+    if (lastNote && lastNote.sections && lastNote.sections.length) {
+      setSections(lastNote.sections.map(function(s, i) {
+        return { id: 'sec-' + Date.now() + '-' + i, title: s.title, content: s.content || '', starred: false };
+      }));
+      if (!raison.trim()) setRaison(lastNote.title || '');
+    }
+    var epId = (lastNote && lastNote.episodeId) || ('ep-' + Date.now());
+    setEpisodeId(epId);
+    if (onLinkEpisode) onLinkEpisode(epId);
+    if (onOpen) onOpen();
+  }
+
+  function saveDraft() {
+    var id = 'draft-' + Date.now();
+    var savedLabel = 'Sauvegardé à ' + new Date().toTimeString().slice(0, 5);
+    setDrafts(function(prev) {
+      return [{ id: id, savedLabel: savedLabel, raison: raison, sections: sections, chips: chips,
+        date: noteDate, time: noteTime, visitType: visitType, tags: tags }].concat(prev);
+    });
+    if (window.toast) window.toast('Brouillon sauvegardé', { icon: 'check_circle' });
+    resetNote();
+    if (onDraftSaved) onDraftSaved();
+  }
+
+  function continueDraft(id) {
+    var draft = drafts.find(function(d) { return d.id === id; });
+    if (!draft) return;
+    setDrafts(function(prev) { return prev.filter(function(d) { return d.id !== id; }); });
+    setSections(draft.sections);
+    setRaison(draft.raison || '');
+    setChips(draft.chips || {});
+    setTags(draft.tags || []);
+    if (draft.visitType) setVisitType(draft.visitType);
+    if (onOpen) onOpen();
+  }
+
+  function handleStartPick(key, payload) {
+    if (key === 'nouvelle') { if (onOpen) onOpen(); return; }
+    if (key === 'derniere') { startFromLast(); return; }
+    if (key === 'continuer') { continueDraft(payload); return; }
+    if (key === 'intelligente') { if (onSmartPick) onSmartPick(); return; }
   }
 
   // Build the list of sendable documents (prescriptions, requests, patient
@@ -673,6 +726,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doct
       diagnostics: scanDiagNames(sections),
       sections: sections,
       chips: chips,
+      episodeId: episodeId,
     };
     resetNote();
     if (onComplete) onComplete(data);
@@ -680,6 +734,7 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doct
 
   React.useEffect(function() {
     if (completeRef) completeRef.current = openCheckout;
+    if (saveDraftRef) saveDraftRef.current = saveDraft;
     // « Prescrire » / « Transmettre » sur un chip ouvre le flux d'envoi (checkout).
     function onOpenCheckout() { openCheckout(); }
     window.addEventListener('note:open-checkout', onOpenCheckout);
@@ -718,6 +773,15 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doct
           : <span className="material-icons-outlined" style={neStyles.docIcon}>insert_drive_file</span>
         }
       </div>
+
+      {/* Points de départ — tweak "Points de départ", masqués une fois la note ouverte */}
+      {startPoints && !isOpen &&
+        <div style={{ marginBottom: 20 }}>
+          <NoteStartCards
+            onPick={handleStartPick}
+            hasLastNote={!!(lastNote && lastNote.sections && lastNote.sections.length)}
+            drafts={drafts} />
+        </div>}
 
       {/* Fields */}
       <div style={neStyles.fieldsRow}>

@@ -1,6 +1,34 @@
 /* global React */
 const NOTE_ITEMS_TEMPLATE = [
   {
+    date: "2 JUILLET 2026 13:45",
+    author: "%%DOCTOR%%",
+    clinic: "Clinique du Centre-ville",
+    role: "Médecin de famille",
+    mode: "PRÉSENTIEL",
+    title: "Retour post-imagerie — douleur au flanc",
+    icons: [],
+    diagnostics: ["Colique néphrétique"],
+    episodeId: "ep-demo-flanc",
+    details: "Patient de retour suite à la TDM. Douleur en nette amélioration depuis l'analgésie.\nTDM : Calcul urétéral droit de 4 mm, sans dilatation significative.",
+    conclusion: "Impression : Colique néphrétique confirmée, calcul de 4 mm.\nPlan : Poursuite de l'analgésie et hydratation. Filtration des urines. Retour si fièvre, douleur non contrôlée ou absence de progression dans 2 semaines.",
+    files: [{ name: "TDM abdomino-pelvien.pdf", size: "1.4MB" }],
+  },
+  {
+    date: "2 JUILLET 2026 09:10",
+    author: "%%DOCTOR%%",
+    clinic: "Clinique du Centre-ville",
+    role: "Médecin de famille",
+    mode: "PRÉSENTIEL",
+    title: "Douleur au flanc droit",
+    icons: [],
+    diagnostics: [],
+    episodeId: "ep-demo-flanc",
+    details: "Motif : Douleur au flanc droit depuis 2 jours, irradiant vers l'aine. Pas d'hématurie visible. Pas de fièvre.\nObjectif : Punch rénal droit positif. Abdomen souple. Bandelette urinaire : Sang traces, Leuco négatif.",
+    conclusion: "Impression : Suspicion de colique néphrétique.\nPlan : Requête d'imagerie (TDM abdomino-pelvien sans contraste) envoyée. Analgésie prescrite. Patient dirigé vers l'imagerie, retour prévu avec les résultats.",
+    files: [],
+  },
+  {
     date: "8 DÉCEMBRE 2025 09:15",
     author: "Dr Marc Lefebvre",
     clinic: "Clinique du Centre-ville",
@@ -161,6 +189,16 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
   const [openNotes, setOpenNotes] = React.useState({});
   const [activeFilters, setActiveFilters] = React.useState(new Set());
 
+  // Épisode de soin : notes distinctes (chacune garde son propre timestamp)
+  // reliées par un episodeId commun — ex. consultation puis retour après une
+  // requête d'imagerie. NOTE_ITEMS est du plus récent au plus ancien, donc la
+  // "visite 1" est celle dont l'index dans le groupe est le plus grand.
+  const episodeGroups = {};
+  NOTE_ITEMS.forEach((n, idx) => {
+    if (!n.episodeId) return;
+    (episodeGroups[n.episodeId] = episodeGroups[n.episodeId] || []).push(idx);
+  });
+
   const toggleFilter = (key) => setActiveFilters(prev => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -209,8 +247,16 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
         const origIdx = NOTE_ITEMS.indexOf(n);
         const isOpen = !!openNotes[origIdx];
         const starredSections = (n.sections || []).filter(function(s) { return s.starred; });
+        const epMembers = n.episodeId ? episodeGroups[n.episodeId] : null;
+        const epTotal = epMembers ? epMembers.length : 0;
+        const epVisitNum = epMembers ? epTotal - epMembers.indexOf(origIdx) : 0;
         return (
-          <div key={origIdx} style={{ ...nlStyles.note, ...(i > 0 ? nlStyles.noteBorder : {}) }}>
+          <div key={origIdx} style={{
+            ...nlStyles.note,
+            borderTop: i > 0 ? '1px solid #eee' : 'none',
+            borderLeft: epTotal > 1 ? '3px solid var(--brand-primary, rgb(46,56,166))' : 'none',
+            paddingLeft: epTotal > 1 ? 14 : 0,
+          }}>
             {/* Left meta column */}
             <div style={nlStyles.metaCol}>
               <div style={nlStyles.dateRow}>
@@ -234,6 +280,11 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
                       <span className="material-icons" style={nlStyles.titleStarIcon} title="Contient une section importante">star</span>}
                   </div>
                 </div>
+                {epTotal > 1 &&
+                  <span style={nlStyles.episodeChip}>
+                    <span className="material-icons-outlined" style={nlStyles.episodeIcon}>link</span>
+                    Épisode de soin · visite {epVisitNum}/{epTotal}
+                  </span>}
                 <div style={{ flex: 1 }} />
                 <div style={nlStyles.actionIcons}>
                   <button style={nlStyles.checkoutBtn}>Checkout</button>
@@ -403,8 +454,13 @@ const nlStyles = {
   authorChipActive: {
     background: "#e8f0fb", borderColor: "#1975d1", color: "#1975d1",
   },
-  note: { display: "flex", gap: 28, padding: "18px 0" },
-  noteBorder: { borderTop: "1px solid #eee" },
+  note: { display: "flex", gap: 28, paddingTop: 18, paddingBottom: 18 },
+  episodeChip: {
+    display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-start", marginTop: 2,
+    background: "var(--brand-primary-container, #e5e2f3)", color: "var(--brand-primary, rgb(46,56,166))",
+    borderRadius: 20, padding: "3px 10px 3px 8px", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap",
+  },
+  episodeIcon: { fontSize: 14 },
   metaCol: { width: 220, flexShrink: 0 },
   dateRow: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 },
   noteFileIcon: { fontSize: 18, color: "rgba(0,0,0,0.45)" },

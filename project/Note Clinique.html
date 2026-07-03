@@ -187,7 +187,8 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "doctorName": "Véronique Charland",
   "diagStyle": "actuel",
   "showClinicalTools": true,
-  "portalActive": true
+  "portalActive": true,
+  "startPoints": false
 } /*EDITMODE-END*/;
 
 function App() {
@@ -199,6 +200,7 @@ function App() {
   const [completedNotes, setCompletedNotes] = React.useState([]);
   const [chipCounts, setChipCounts] = React.useState({});
   const noteCompleteRef = React.useRef(null);
+  const noteSaveDraftRef = React.useRef(null);
 
   React.useEffect(() => {
     function handler(e) { setChipCounts(e.detail || {}); }
@@ -220,9 +222,18 @@ function App() {
     setNoteOpen(true);
     setTimeout(() => setBannerCollapsed(true), 260);
   }
-  function handlePick(key) {
-    if (key === 'intelligente') { setSmartModal(true); return; }
-    handleNoteOpen();
+  // « Depuis la dernière note » lie les deux notes au même épisode de soin —
+  // si la dernière note n'en avait pas encore, on lui en assigne un ici (elle
+  // garde son propre timestamp ; seule la liste affiche le lien — NotesList.jsx).
+  function handleLinkEpisode(epId) {
+    setCompletedNotes(prev => {
+      if (!prev.length || prev[0].episodeId) return prev;
+      return prev.map((n, i) => i === 0 ? { ...n, episodeId: epId } : n);
+    });
+  }
+  function handleDraftSaved() {
+    setNoteOpen(false);
+    setBannerCollapsed(false);
   }
   function handleNoteComplete(data) {
     const months = ['JANVIER','FÉVRIER','MARS','AVRIL','MAI','JUIN','JUILLET','AOÛT','SEPTEMBRE','OCTOBRE','NOVEMBRE','DÉCEMBRE'];
@@ -242,6 +253,7 @@ function App() {
       files: [],
       sections: data.sections || [],
       chips: data.chips || {},
+      episodeId: data.episodeId || null,
     };
     setCompletedNotes(prev => [newNote, ...prev]);
     setNoteOpen(false);
@@ -265,7 +277,13 @@ function App() {
               doctorName={t.doctorName}
               institution="Clinique du Centre-ville"
               smartActive={smartActive}
-              showClinicalTools={t.showClinicalTools} />
+              showClinicalTools={t.showClinicalTools}
+              startPoints={t.startPoints}
+              lastNote={completedNotes[0] || null}
+              onLinkEpisode={handleLinkEpisode}
+              onDraftSaved={handleDraftSaved}
+              onSmartPick={() => setSmartModal(true)}
+              saveDraftRef={noteSaveDraftRef} />
             <NotesList doctorName={t.doctorName} extraNotes={completedNotes} />
             {noteOpen &&
             <div className="note-footer" style={{ gap: "8px", borderRadius: "16px 16px 16px 1px", padding: "16px" }}>
@@ -312,7 +330,8 @@ function App() {
                 </div>
               )}
               <div style={{ flex: 1 }} />
-              <button style={{ border: '1px solid #d0d0e0', borderRadius: 8, background: '#eeeef8', padding: '9px 22px', cursor: 'pointer', font: "500 14px 'Inter',sans-serif", color: '#25245E' }}>Sauvegarder</button>
+              <button style={{ border: '1px solid #d0d0e0', borderRadius: 8, background: '#eeeef8', padding: '9px 22px', cursor: 'pointer', font: "500 14px 'Inter',sans-serif", color: '#25245E' }}
+                onClick={() => { if (noteSaveDraftRef.current) noteSaveDraftRef.current(); }}>Sauvegarder</button>
               <button style={{ border: 0, borderRadius: 8, background: '#25245E', padding: '9px 24px', cursor: 'pointer', font: "600 14px 'Inter',sans-serif", color: '#fff' }}
                 onClick={() => { if (noteCompleteRef.current) noteCompleteRef.current(); }}>Compléter</button>
             </div>
@@ -338,6 +357,8 @@ function App() {
                      onChange={(v) => setTweak('showClinicalTools', v)} />
         <TweakToggle label="Portail patient actif" value={t.portalActive !== false}
                      onChange={(v) => setTweak('portalActive', v)} />
+        <TweakToggle label="Points de départ" value={t.startPoints === true}
+                     onChange={(v) => setTweak('startPoints', v)} />
         <TweakSection label="Diagnostics" />
         <TweakRadio label="Style de région"
                     value={t.diagStyle || 'actuel'}
