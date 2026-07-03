@@ -1,5 +1,5 @@
 /* global React */
-function PatientBanner({ forceCollapsed }) {
+function PatientBanner({ forceCollapsed, portalActive = true }) {
   const [phase, setPhase] = React.useState('expanded');
   const phaseRef = React.useRef(phase);
   phaseRef.current = phase;
@@ -63,6 +63,10 @@ function PatientBanner({ forceCollapsed }) {
           <button style={pbStyles.consentBadge} aria-label="consentement valide">
             <span className="material-icons" style={{ fontSize: 18, color: "#1565c0" }}>thumb_up</span>
           </button>
+          {portalActive &&
+            <button style={pbStyles.portalBadge} aria-label="portail patient actif" title="Portail patient actif">
+              <span className="material-icons" style={{ fontSize: 18, color: "#1565c0" }}>verified_user</span>
+            </button>}
           <button style={pbStyles.iconBtn} aria-label="imprimer">
             <span className="material-icons-outlined" style={pbStyles.iconBtnIc}>print</span>
           </button>
@@ -156,10 +160,17 @@ function PatientBanner({ forceCollapsed }) {
         </button>
       </div>
 
-      {/* Consentement */}
-      <div style={pbStyles.consentRow}>
-        <span className="material-icons" style={{ fontSize: 20, color: "#39ab49" }}>thumb_up</span>
-        <span style={pbStyles.consentText}>Consentement valide</span>
+      {/* Consentement + portail patient */}
+      <div style={pbStyles.statusStack}>
+        <div style={pbStyles.statusRow}>
+          <span className="material-icons" style={{ fontSize: 20, color: "#39ab49" }}>thumb_up</span>
+          <span style={pbStyles.consentText}>Consentement valide</span>
+        </div>
+        {portalActive &&
+          <div style={pbStyles.statusRow}>
+            <span className="material-icons" style={{ fontSize: 18, color: "#1565c0" }}>verified_user</span>
+            <span style={pbStyles.portalText}>Portail patient actif</span>
+          </div>}
       </div>
     </div>
     </div>
@@ -196,8 +207,10 @@ const pbStyles = {
   clinicName: { fontSize: 14, color: "rgba(0,0,0,0.82)", fontWeight: 500 },
   addrRow: { display: "flex", alignItems: "center", gap: 6 },
   sendIcon: { fontSize: 16, color: "#1975d1" },
-  consentRow: { position: "absolute", bottom: 14, right: 18, display: "flex", alignItems: "center", gap: 8 },
+  statusStack: { position: "absolute", bottom: 14, right: 18, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 },
+  statusRow: { display: "flex", alignItems: "center", gap: 8 },
   consentText: { fontSize: 14, color: "#2e7d32", fontWeight: 500 },
+  portalText: { fontSize: 13, color: "#1565c0", fontWeight: 500 },
   actions: { display: "flex", alignItems: "center", gap: 6, flexShrink: 0 },
   calBtn: { width: 40, height: 40, borderRadius: 8, border: 0, background: "#23235a", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" },
   ghostBtn: { width: 40, height: 40, borderRadius: 8, border: 0, background: "transparent", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" },
@@ -217,6 +230,7 @@ const pbStyles = {
   iconBtn: { width: 34, height: 34, borderRadius: 7, border: "1px solid #e5e5e5", background: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" },
   iconBtnIc: { fontSize: 20, color: "rgba(0,0,0,0.55)" },
   consentBadge: { width: 34, height: 34, borderRadius: 7, border: "1.5px solid #1565c0", background: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" },
+  portalBadge: { width: 34, height: 34, borderRadius: 7, border: "1.5px solid #1565c0", background: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" },
 };
 
 window.PatientBanner = PatientBanner;

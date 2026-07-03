@@ -153,6 +153,7 @@
 (function () {
   var srcs = [
     'tweaks-panel.jsx',
+    'note-ui/Toast.jsx',
     'note-ui/TopBar.jsx',
     'note-ui/SideNav.jsx',
     'note-ui/PatientBanner.jsx',
@@ -185,7 +186,8 @@
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "doctorName": "Véronique Charland",
   "diagStyle": "actuel",
-  "showClinicalTools": true
+  "showClinicalTools": true,
+  "portalActive": true
 } /*EDITMODE-END*/;
 
 function App() {
@@ -203,6 +205,15 @@ function App() {
     window.addEventListener('note:chips-change', handler);
     return () => window.removeEventListener('note:chips-change', handler);
   }, []);
+
+  // Notifie l'entrée au dossier quand le portail patient est actif — le
+  // toast s'auto-efface après 5s, mais l'indicatif reste visible en continu
+  // dans le PatientBanner (contenu temporisé seul = problème d'accessibilité).
+  React.useEffect(() => {
+    if (t.portalActive) {
+      toast('Portail patient actif', { icon: 'verified_user', duration: 5000 });
+    }
+  }, [t.portalActive]);
 
   function handleNoteOpen() {
     if (noteOpen) return;
@@ -244,7 +255,7 @@ function App() {
         <SideNav />
         <div className="content">
           <div className="center-wrap">
-          <PatientBanner forceCollapsed={bannerCollapsed} />
+          <PatientBanner forceCollapsed={bannerCollapsed} portalActive={t.portalActive} />
           <div className="center-col" style={{ padding: "0px" }}>
             <NoteEditor
               isOpen={noteOpen}
@@ -313,6 +324,7 @@ function App() {
       </div>
 
       <FloatingToolbar />
+      <ToastHost />
       {smartModal &&
         <SmartNoteModal
           onCancel={() => setSmartModal(false)}
@@ -324,6 +336,8 @@ function App() {
         <TweakSection label="Général" />
         <TweakToggle label="Outils cliniques" value={t.showClinicalTools !== false}
                      onChange={(v) => setTweak('showClinicalTools', v)} />
+        <TweakToggle label="Portail patient actif" value={t.portalActive !== false}
+                     onChange={(v) => setTweak('portalActive', v)} />
         <TweakSection label="Diagnostics" />
         <TweakRadio label="Style de région"
                     value={t.diagStyle || 'actuel'}
