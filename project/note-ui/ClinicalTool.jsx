@@ -81,6 +81,48 @@ function ClinicalTool({ onClose, onHandleDown, dragging, bodyCollapsed: bodyColl
   const [fav, setFav] = React.useState(false);
   const [effDate] = React.useState(function () { return new Date().toISOString().slice(0, 10); });
 
+  // Résumé affiché quand l'outil est replié — lit l'état réel du DOM (les
+  // champs internes CTField/CTCheck/CTSeg gardent leur propre state, jamais
+  // remonté) au moment du collapse plutôt que de dupliquer un modèle de données.
+  const bodyRef = React.useRef(null);
+  const [summary, setSummary] = React.useState('');
+  function buildSummary() {
+    const root = bodyRef.current;
+    if (!root) return '';
+    const parts = [];
+    const cleanLabel = function (txt) { return (txt || '').trim().replace(/\s*:?\s*$/, ''); };
+
+    root.querySelectorAll('.ct-seg button.is-on').forEach(function (btn) {
+      const row = btn.closest('.ct-qrow');
+      const field = !row ? btn.closest('.ct-field') : null;
+      const lblEl = row ? row.querySelector('.ct-qrow__lbl') : (field ? field.querySelector('label') : null);
+      const lbl = cleanLabel(lblEl && lblEl.textContent);
+      if (lbl) parts.push(lbl + ' : ' + btn.textContent);
+    });
+
+    root.querySelectorAll('.ct-check input[type="checkbox"]:checked').forEach(function (cb) {
+      const span = cb.nextElementSibling;
+      const txt = span && span.textContent.trim();
+      if (txt) parts.push(txt);
+    });
+
+    root.querySelectorAll('.ct-field').forEach(function (f) {
+      const label = f.querySelector('label');
+      const input = f.querySelector('input, select');
+      if (!label || !input || !input.value || input.type === 'date') return;
+      const lbl = cleanLabel(label.textContent);
+      if (lbl) parts.push(lbl + ' : ' + input.value);
+    });
+
+    if (!parts.length) return 'Aucune donnée saisie';
+    const MAX = 4;
+    const shown = parts.slice(0, MAX).join(' · ');
+    return parts.length > MAX ? shown + ' · +' + (parts.length - MAX) + ' autres' : shown;
+  }
+  React.useEffect(function () {
+    if (bodyCollapsed) setSummary(buildSummary());
+  }, [bodyCollapsed]);
+
   // examen physique selects
   const [phys, setPhys] = React.useState({});
   function setP(k) { return function (e) { setPhys(function (p) { return Object.assign({}, p, { [k]: e.target.value }); }); }; }
@@ -106,6 +148,8 @@ function ClinicalTool({ onClose, onHandleDown, dragging, bodyCollapsed: bodyColl
           <span className="ct-bar__overline">Outil clinique</span>
           <span className="ct-bar__title">Symptômes d'une infection urinaire</span>
         </span>
+        {bodyCollapsed && summary &&
+          <span className="ct-bar__summary">{summary}</span>}
         <span className="ct-bar__actions">
           <button className={"ct-iconbtn" + (fav ? " is-fav" : "")} title="Favori" onClick={function () { setFav(!fav); }}>
             <span className="material-icons">{fav ? "favorite" : "favorite_border"}</span>
@@ -120,7 +164,7 @@ function ClinicalTool({ onClose, onHandleDown, dragging, bodyCollapsed: bodyColl
         </span>
       </div>
 
-      <div className="ct-body" style={bodyCollapsed ? { display: "none" } : null}>
+      <div className="ct-body" ref={bodyRef} style={bodyCollapsed ? { display: "none" } : null}>
         <div className="ct-effrow">
           <CTField label="Date d'entrée en vigueur" type="date" value={effDate} />
         </div>
