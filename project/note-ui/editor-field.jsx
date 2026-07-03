@@ -34,6 +34,7 @@ function newDiagId() {return 'd' + _diagSeq++;}
         const kind = data.rx.kind || 'rx';
         node.classList.add('chip--rx');
         node.classList.add('chip--' + kind);
+        if (data.rx.ceased) node.classList.add('chip--ceased');
         node.setAttribute('data-rx', JSON.stringify(data.rx));
         node.setAttribute('data-label', data.label || '');
         const d = data.details || {};
@@ -1362,7 +1363,12 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     onChange(stored);
   }
 
-  function insertOrderChip(item) {
+  // action (médications au dossier seulement) : undefined/'renouveler' = même
+  // sig qu'au dossier ; 'ajuster' = idem puis ouvre l'édition complète ;
+  // 'cesser' = chip sans posologie, texte "Cessé" — distingue visuellement
+  // une cessation d'une nouvelle prescription plutôt que de dupliquer en
+  // silence la même entrée (donner un sens dossier vs nouvelle prescription).
+  function insertOrderChip(item, action) {
     const q = quillRef.current;
     const s = slashStateRef.current;
     if (!q || !s || !item) return;
@@ -1370,7 +1376,11 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     const def = window.NOTE_DATA.ORDER_DEFS[kind];
     const chipId = newChipId();
     const label = (item.name + ' ' + (item.dose || '')).trim();
-    const rx = { name: item.name, dose: item.dose || '', sig: item.chipSig || item.sig, kind };
+    const isCeasing = action === 'cesser' && kind === 'rx';
+    const itemDetails = isCeasing ? {} : (item.details || {});
+    const rx = isCeasing
+      ? { name: item.name, dose: item.dose || '', sig: 'Cessé', kind: kind, ceased: true }
+      : { name: item.name, dose: item.dose || '', sig: item.chipSig || item.sig, kind: kind };
     const bIdx = orderBadgeIndex();
     const at = bIdx >= 0 ? bIdx : s.startIndex;
     const removeLen = (bIdx >= 0 ? 1 : 0) + (s.query || '').length;
@@ -1380,7 +1390,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     clearSlashPaint();
     silentRef.current = true;
     if (removeLen > 0) q.deleteText(at, removeLen, 'silent');
-    q.insertEmbed(at, 'chip', { cid: chipId, type: def.type, label, icon: def.icon, rx, details: item.details || {} }, 'silent');
+    q.insertEmbed(at, 'chip', { cid: chipId, type: def.type, label, icon: def.icon, rx, details: itemDetails }, 'silent');
     q.insertText(at + 1, ' ', 'silent');
     // If we were inside a diagnostic body, re-assert the line format — Quill's
     // normalizer can silently drop it after an embed insertion on a block boundary.
@@ -1394,9 +1404,9 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       entity: {
         type: def.type,
         label,
-        text: label + ' — ' + (item.chipSig || item.sig),
+        text: isCeasing ? label + ' — Cessé' : label + ' — ' + (item.chipSig || item.sig),
         rx,
-        details: JSON.parse(JSON.stringify(item.details || {}))
+        details: JSON.parse(JSON.stringify(itemDetails))
       },
       _prebuilt: true,
       storedOverride: stored
@@ -1404,6 +1414,15 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     setSlash(null); slashStateRef.current = null;
     setGhost(null);
     refocusAfterInsert(at + 2);
+    // « Ajuster » : réutilise le mécanisme existant du bouton ℞ (data-action
+    // "modal") pour ouvrir directement l'édition complète de la posologie —
+    // le nœud du chip n'existe qu'après ce tick de rendu.
+    if (action === 'ajuster' && onChipClick) {
+      setTimeout(function () {
+        const node = document.querySelector('[data-cid="' + chipId + '"]');
+        if (node) onChipClick(chipId, node.getBoundingClientRect(), { action: 'modal' });
+      }, 80);
+    }
   }
 
   function handleFileChange(e) {
@@ -1739,7 +1758,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         results={orderResults}
         activeIndex={slash.activeIndex}
         onHover={(i) => setSlash((s) => {if (!s) return s;const ns = { ...s, activeIndex: i };slashStateRef.current = ns;return ns;})}
-        onSelect={(it) => insertOrderChip(it)}
+        onSelect={(it, action) => insertOrderChip(it, action)}
         onToggleFav={(k) => {window.NOTE_DATA.toggleOrderFav(orderKind, k);setFavBump((n) => n + 1);}}
         onClose={() => closeSlashMenu()} />
 

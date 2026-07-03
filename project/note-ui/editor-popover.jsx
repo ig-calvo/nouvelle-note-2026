@@ -480,12 +480,13 @@ function RxMenu({ position, kind, def, query, results, activeIndex, onSelect, on
               flat += 1;
               const idx = flat;
               const fav = favSet.has(it.key);
+              const isActiveMed = it.med && it.medStatus === 'active';
               return (
                 <div key={it.key} role="option" aria-selected={idx === activeIndex}
                   className={'rx-item' + (idx === activeIndex ? ' is-active' : '')}
                   onMouseEnter={() => onHover(idx)}
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => onSelect(it)}>
+                  onClick={() => onSelect(it, isActiveMed ? 'renouveler' : undefined)}>
                   <div className="rx-item__body">
                     <div className="rx-item__name">
                       <RxNameHighlight name={it.name} query={query} /> {it.dose}
@@ -494,9 +495,25 @@ function RxMenu({ position, kind, def, query, results, activeIndex, onSelect, on
                   </div>
                   <div className="rx-item__actions">
                     {it.med
-                      ? <span className={'rx-status ' + (it.medStatus === 'active' ? 'rx-status--active' : 'rx-status--ceased')} title={it.medStatusLabel || ''}>
-                          {it.medStatus === 'active' ? 'Actif' : 'Cessé'}
-                        </span>
+                      ? (isActiveMed
+                          ? <span className="rx-med-actions">
+                              <button type="button" className="rx-med-btn" title="Renouveler — même posologie"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={(e) => { e.stopPropagation(); onSelect(it, 'renouveler'); }}>
+                                <span className="material-icons-outlined">refresh</span>
+                              </button>
+                              <button type="button" className="rx-med-btn" title="Ajuster la posologie"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={(e) => { e.stopPropagation(); onSelect(it, 'ajuster'); }}>
+                                <span className="material-icons-outlined">tune</span>
+                              </button>
+                              <button type="button" className="rx-med-btn rx-med-btn--stop" title="Cesser"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={(e) => { e.stopPropagation(); onSelect(it, 'cesser'); }}>
+                                <span className="material-icons-outlined">block</span>
+                              </button>
+                            </span>
+                          : <span className="rx-status rx-status--ceased" title={it.medStatusLabel || ''}>Cessé</span>)
                       : <button type="button" className={'rx-heart' + (fav ? ' is-fav' : '')}
                           title={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
                           onMouseDown={(e) => e.preventDefault()}

@@ -293,6 +293,10 @@
 /* Inline order chip (℞/lab/img · Name dose · [detail box] · free text) */
 .chip--rx { background: #fff; border: 1px solid #c3ccd5; color: var(--fg-1); border-radius: 6px; padding: 2px 8px; gap: 6px; margin: 0 3px; font-weight: 500; box-shadow: 0 1px 2px rgba(37,36,94,0.05); }
 .chip--rx:hover { background: #f7f7fd; box-shadow: var(--elev-1); }
+/* Cessation d'une médication au dossier — distincte d'une nouvelle Rx */
+.chip--rx.chip--ceased { background: #fbf1f1; border-color: #e3bcbc; }
+.chip--rx.chip--ceased .chip-rx-name { text-decoration: line-through; text-decoration-color: #b04a4a; }
+.chip--rx.chip--ceased .chip-rx-poso { color: #a13d3d; font-weight: 700; }
 .chip--rx.open { background: #f2f1fc; box-shadow: 0 0 0 2px rgba(46,56,166,0.14); }
 .chip--rx .chip-rx-icon { font-family: var(--font-display); font-weight: 700; font-size: 16px; color: #25245E; line-height: 1; }
 .chip--rx .chip-rx-glyph { font-size: 17px !important; line-height: 1; color: #25245E; }
@@ -341,12 +345,18 @@
 .rx-heart:hover { color: #e0245e; background: rgba(224,36,94,0.08); }
 .rx-heart .material-icons { font-size: 22px; }
 .rx-heart.is-fav { color: #e8112d; }
-/* Pastille de statut (médication au dossier) */
+/* Pastille de statut (médication cessée au dossier) */
 .rx-status { display: inline-flex; align-items: center; font: 600 11px/16px var(--font-body); padding: 2px 8px; border-radius: 4px; white-space: nowrap; letter-spacing: 0.2px; }
-.rx-status--active { background: #e0ebe6; color: #39604d; }
 .rx-status--ceased { background: #ecdfe0; color: #7a1f26; }
 .rx-active { width: 22px; height: 22px; border-radius: 50%; background: #1975d1; color: #fff; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .rx-active .material-icons { font-size: 15px; }
+/* Actions sur une médication active au dossier — donne un sens distinct
+   entre renouveler/ajuster une Rx existante et en créer une nouvelle. */
+.rx-med-actions { display: flex; align-items: center; gap: 2px; }
+.rx-med-btn { border: 0; background: transparent; cursor: pointer; padding: 4px; display: inline-flex; color: var(--fg-3); border-radius: 6px; transition: background 110ms, color 110ms; }
+.rx-med-btn:hover { background: rgba(25,117,209,0.10); color: #1975d1; }
+.rx-med-btn .material-icons-outlined { font-size: 19px; }
+.rx-med-btn--stop:hover { background: rgba(211,47,47,0.10); color: #d32f2f; }
 .rx-empty { padding: 18px 16px; font-size: 13px; color: var(--fg-3); }
 .rx-menu__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 12px; font-size: 10px; color: var(--fg-3); border-top: 1px solid var(--border-subtle); background: var(--bg-subtle); }
 .rx-menu__foot kbd { font-family: var(--font-mono); font-size: 9px; background: var(--surface-2); border: 1px solid var(--border-subtle); padding: 1px 4px; border-radius: 3px; color: var(--fg-2); font-weight: 600; }
