@@ -183,7 +183,8 @@
 
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "doctorName": "Véronique Charland"
+  "doctorName": "Véronique Charland",
+  "diagStyle": "actuel"
 } /*EDITMODE-END*/;
 
 function App() {
@@ -236,7 +237,7 @@ function App() {
     setBannerCollapsed(false);
   }
   return (
-    <div className="app">
+    <div className={"app diag-style-" + (t.diagStyle || 'actuel')}>
       <TopBar user={t.doctorName} />
       <div className="main-row">
         <SideNav />
@@ -318,6 +319,16 @@ function App() {
       <TweaksPanel title="Tweaks">
         <TweakSection label="Médecin" />
         <TweakText label="Nom du médecin" value={t.doctorName} onChange={(v) => setTweak("doctorName", v)} />
+        <TweakSection label="Diagnostics" />
+        <TweakRadio label="Style de région"
+                    value={t.diagStyle || 'actuel'}
+                    options={[
+                      { value: 'actuel', label: 'Actuel' },
+                      { value: 'carte', label: 'Carte' },
+                      { value: 'etiquette', label: 'Étiquette' },
+                      { value: 'rail', label: 'Rail' },
+                    ]}
+                    onChange={(v) => setTweak('diagStyle', v)} />
       </TweaksPanel>
     </div>);
 

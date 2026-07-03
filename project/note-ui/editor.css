@@ -166,6 +166,115 @@
   margin-bottom: 12px !important;
 }
 
+/* ============================================================
+   Diagnostic region — variantes (tweak "Style de région").
+   Le style par défaut ci-dessus reste "actuel" (accent gauche).
+   Chaque variante ci-dessous est scopée par une classe posée sur
+   .app (diag-style-carte / -etiquette / -rail) et ne touche ni
+   les blots Quill ni la sérialisation {{DIAG:...}}.
+   ============================================================ */
+
+/* --- Carte : callout plein, coins arrondis, sans accent gauche --- */
+.diag-style-carte .note-field .ql-editor .ql-diag-header {
+  background: #ECF3F7;
+  border-left: none;
+  border-radius: 10px 10px 0 0;
+  padding: 8px 14px 5px 12px;
+  margin: 14px 0 0;
+}
+.diag-style-carte .note-field .ql-editor .ql-diag-header .ql-diag-ic {
+  background: rgba(25, 117, 209, 0.14);
+  color: #1975d1;
+  border-radius: 50%;
+  padding: 3px;
+  font-size: 13px !important;
+}
+.diag-style-carte .note-field .ql-editor .ql-diag-header .ql-diag-name {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #0f5fa8;
+}
+.diag-style-carte .note-field .ql-editor .ql-diag-line {
+  background: #ECF3F7;
+  border-left: none;
+  padding: 2px 14px;
+}
+.diag-style-carte .note-field .ql-editor .ql-diag-header + .ql-diag-line {
+  padding-top: 4px;
+}
+.diag-style-carte .note-field .ql-editor .ql-diag-line:not(:has(+ .ql-diag-line)) {
+  border-radius: 0 0 10px 10px;
+  padding-bottom: 10px;
+  margin-bottom: 14px !important;
+}
+
+/* --- Étiquette : pill compacte flottante + corps flush indenté --- */
+.diag-style-etiquette .note-field .ql-editor .ql-diag-header {
+  display: inline-flex;
+  background: var(--brand-primary-container, #e5e2f3);
+  border-left: none;
+  border-radius: 999px;
+  padding: 3px 12px 3px 8px;
+  margin: 12px 0 3px;
+}
+.diag-style-etiquette .note-field .ql-editor .ql-diag-header .ql-diag-ic {
+  font-size: 13px !important;
+  color: var(--brand-primary, rgb(46, 56, 166));
+}
+.diag-style-etiquette .note-field .ql-editor .ql-diag-header .ql-diag-name {
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--brand-primary, rgb(46, 56, 166));
+}
+.diag-style-etiquette .note-field .ql-editor .ql-diag-line {
+  border-left: none;
+  padding: 1px 12px 1px 20px;
+}
+.diag-style-etiquette .note-field .ql-editor .ql-diag-header + .ql-diag-line {
+  padding-top: 2px;
+}
+.diag-style-etiquette .note-field .ql-editor .ql-diag-line:not(:has(+ .ql-diag-line)) {
+  border-bottom: 1px solid rgba(46, 56, 166, 0.12);
+  padding-bottom: 9px;
+  margin-bottom: 14px !important;
+}
+
+/* --- Rail : bandeau plein largeur + corps indenté + trait de fermeture --- */
+.diag-style-rail .note-field .ql-editor .ql-diag-header {
+  background: #eef1f6;
+  border-left: none;
+  border-radius: 6px 6px 0 0;
+  padding: 6px 12px;
+  margin: 14px 0 0;
+}
+.diag-style-rail .note-field .ql-editor .ql-diag-header .ql-diag-ic {
+  font-size: 14px !important;
+  color: #3d5a80;
+}
+.diag-style-rail .note-field .ql-editor .ql-diag-header .ql-diag-name {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #3d5a80;
+}
+.diag-style-rail .note-field .ql-editor .ql-diag-line {
+  border-left: none;
+  padding: 1px 12px 1px 18px;
+}
+.diag-style-rail .note-field .ql-editor .ql-diag-header + .ql-diag-line {
+  padding-top: 4px;
+}
+.diag-style-rail .note-field .ql-editor .ql-diag-line:not(:has(+ .ql-diag-line)) {
+  border-bottom: 1px solid #dde2ea;
+  padding-bottom: 9px;
+  margin-bottom: 14px !important;
+}
+
 /* Inline hint shown right after a bare "/" prompting the user to type */
 .slash-hint {
   font-family: var(--font-body);
