@@ -208,6 +208,7 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
       {filtered.map((n, i) => {
         const origIdx = NOTE_ITEMS.indexOf(n);
         const isOpen = !!openNotes[origIdx];
+        const starredSections = (n.sections || []).filter(function(s) { return s.starred; });
         return (
           <div key={origIdx} style={{ ...nlStyles.note, ...(i > 0 ? nlStyles.noteBorder : {}) }}>
             {/* Left meta column */}
@@ -227,7 +228,11 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
               <div style={nlStyles.bodyHead}>
                 <div>
                   <div style={nlStyles.mode}>{n.mode}</div>
-                  <div style={nlStyles.noteTitle}>{n.title}</div>
+                  <div style={nlStyles.noteTitle}>
+                    {n.title}
+                    {starredSections.length > 0 &&
+                      <span className="material-icons" style={nlStyles.titleStarIcon} title="Contient une section importante">star</span>}
+                  </div>
                 </div>
                 <div style={{ flex: 1 }} />
                 <div style={nlStyles.actionIcons}>
@@ -249,7 +254,11 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
                   return (
                     <div key={sec.id || si} style={nlStyles.detailsSection}>
                       {(n.sections.length > 1 || sec.type === 'diagnostic') && (
-                        <div style={nlStyles.detailsLabel}>{sec.title}</div>
+                        <div style={nlStyles.detailsLabel}>
+                          {sec.title}
+                          {sec.starred &&
+                            <span className="material-icons" style={nlStyles.titleStarIcon} title="Section importante">star</span>}
+                        </div>
                       )}
                       <div style={nlStyles.detailsText}>
                         <SectionContent content={sec.content} chips={n.chips} />
@@ -267,6 +276,26 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
                   </div>
                 </div>
               ) : null}
+
+              {/* Section(s) étoilée(s) — signal clinique partagé, visible même
+                  repliée. Une fois la note ouverte, la section apparaît déjà
+                  dans la liste complète ci-dessus (avec son étoile), donc on
+                  évite le doublon. */}
+              {!isOpen && starredSections.length > 0 && starredSections.map(function(sec, si) {
+                var hasContent = sec.content && sec.content.trim();
+                if (!hasContent) return null;
+                return (
+                  <div key={'star-' + (sec.id || si)} style={nlStyles.starredRow}>
+                    <div style={nlStyles.starredHeader}>
+                      <span className="material-icons" style={nlStyles.starredIcon}>star</span>
+                      <span style={nlStyles.starredLabel}>{sec.title}</span>
+                    </div>
+                    <div style={nlStyles.starredBody}>
+                      <SectionContent content={sec.content} chips={n.chips} />
+                    </div>
+                  </div>
+                );
+              })}
 
               {/* Diagnostics — always visible (collapsed only shows these) */}
               {n.diagnostics && n.diagnostics.length > 0 && (
@@ -387,6 +416,7 @@ const nlStyles = {
   bodyHead: { display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 },
   mode: { fontSize: 11, fontWeight: 500, letterSpacing: 0.8, color: "rgba(0,0,0,0.5)" },
   noteTitle: { fontSize: 17, fontWeight: 600, color: "rgba(0,0,0,0.85)", marginTop: 2 },
+  titleStarIcon: { fontSize: 16, color: "#f59e0b", marginLeft: 6, verticalAlign: "middle" },
   actionIcons: { display: "flex", alignItems: "center", gap: 10 },
   actionIcon: { fontSize: 20, color: "rgba(0,0,0,0.5)", cursor: "pointer" },
   checkoutBtn: {
@@ -407,6 +437,11 @@ const nlStyles = {
   detailsText: {
     fontSize: 15, color: "rgba(0,0,0,0.82)", lineHeight: 1.6,
   },
+  starredRow: { margin: '2px 0 12px', border: '1px solid #f5d896', borderRadius: 10, overflow: 'hidden', background: '#fffaf0' },
+  starredHeader: { display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px', background: '#fef3dd' },
+  starredIcon: { fontSize: 15, color: '#f59e0b' },
+  starredLabel: { fontSize: 13, fontWeight: 600, color: '#92670c' },
+  starredBody: { padding: '8px 12px', fontSize: 14, color: 'rgba(0,0,0,0.8)', lineHeight: 1.5 },
   diagRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8, marginTop: 2 },
   diagChip: {
     display: 'inline-flex', alignItems: 'center', gap: 5,

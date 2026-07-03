@@ -131,6 +131,15 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doct
       });
     });
   }
+  // Étoile = signal clinique partagé : posée par l'auteur, visible par tous
+  // les intervenants qui consultent la note (liste de notes → note-ui/NotesList.jsx).
+  function toggleSectionStar(sectionId) {
+    setSections(function(secs) {
+      return secs.map(function(s) {
+        return s.id === sectionId ? Object.assign({}, s, { starred: !s.starred }) : s;
+      });
+    });
+  }
   function setSplitTop(sectionId, valOrFn) {
     setSectionSplits(function(sp) {
       var prev = sp[sectionId] || { top: '', bot: '' };
@@ -827,6 +836,15 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doct
                         }
                       }),
                   React.createElement('div', { style: { display: 'flex', gap: 2, alignItems: 'center' } },
+                    /* Étoile — signal clinique partagé, visible dans la liste de notes */
+                    React.createElement('button', {
+                        style: neStyles.tbtn,
+                        title: sec.starred ? 'Retirer l\'étoile' : 'Marquer cette section comme importante',
+                        onClick: function() { toggleSectionStar(sec.id); }
+                      }, React.createElement('span', {
+                        className: 'material-icons',
+                        style: { fontSize: 18, color: sec.starred ? '#f59e0b' : 'rgba(0,0,0,0.25)' }
+                      }, 'star')),
                     /* Boutons de réordonnancement */
                     sections.length > 1 && idx > 0
                       ? React.createElement('button', {
