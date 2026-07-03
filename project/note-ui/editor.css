@@ -275,6 +275,56 @@
   margin-bottom: 14px !important;
 }
 
+/* --- Numéroté : titre + bullet numéroté selon la position dans la note ---
+   Le compteur CSS est posé sur .app (une seule fois, tout en haut) : il
+   traverse les sections même si chacune est un composant/Quill distinct,
+   tant qu'elles restent des descendantes DOM de .app dans l'ordre du
+   document — donc toujours synchronisé avec l'ordre réel des sections. */
+.diag-style-numbered {
+  counter-reset: omd-diag-counter;
+}
+.diag-style-numbered .note-field .ql-editor .ql-diag-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  border-left: none;
+  padding: 4px 0 2px;
+  margin: 16px 0 0;
+  counter-increment: omd-diag-counter;
+}
+.diag-style-numbered .note-field .ql-editor .ql-diag-header::before {
+  content: counter(omd-diag-counter) '.';
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  color: #25245E;
+  flex-shrink: 0;
+}
+.diag-style-numbered .note-field .ql-editor .ql-diag-header .ql-diag-ic {
+  display: none;
+}
+.diag-style-numbered .note-field .ql-editor .ql-diag-header .ql-diag-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgba(0, 0, 0, 0.85);
+}
+.diag-style-numbered .note-field .ql-editor .ql-diag-line {
+  border-left: none;
+  padding: 1px 0 1px 23px;
+}
+.diag-style-numbered .note-field .ql-editor .ql-diag-header + .ql-diag-line {
+  padding-top: 3px;
+}
+.diag-style-numbered .note-field .ql-editor .ql-diag-line:not(:has(+ .ql-diag-line)) {
+  padding-bottom: 8px;
+  margin-bottom: 12px !important;
+}
+
 /* ============================================================
    Reference block — passage cité depuis une note antérieure complétée
    (sélection dans NotesList.jsx → « Référencer dans la note »). Registre
