@@ -18,7 +18,13 @@ function scanDiagNames(sections) {
   return out;
 }
 
-function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doctorName, institution }) {
+function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doctorName, institution, showClinicalTools = true }) {
+  // Lu par editor-field.jsx (filterSlash) pour retirer l'entrée "Outils
+  // cliniques" du menu slash sans faire dépendre editor-data.jsx d'une prop.
+  React.useEffect(function() {
+    window.__SHOW_CLINICAL_TOOLS = showClinicalTools;
+  }, [showClinicalTools]);
+
   const DEFAULT_SECTIONS = [
     { id: 'sec-details',    title: 'Détails de la consultation', content: '' },
     { id: 'sec-conclusion', title: 'Conclusion',                 content: '' },
@@ -730,15 +736,17 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doct
                   },
                     React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 4 } },
                       React.createElement('div', { style: neStyles.chipsRow },
-                        React.createElement('button', {
-                          className: 'ct-toolsbtn',
-                          title: 'Outils cliniques',
-                          style: pickerOpen ? { background: '#eef1fb', color: 'var(--brand-primary, #1a5fd4)' } : undefined,
-                          onClick: function(e) {
-                            var r = e.currentTarget.getBoundingClientRect();
-                            if (pickerOpen) { setPickerOpen(false); } else { setPickerAnchor(r); setPickerOpen(true); }
-                          }
-                        }, React.createElement('span', { className: 'material-icons-outlined' }, 'handyman')),
+                        showClinicalTools
+                          ? React.createElement('button', {
+                              className: 'ct-toolsbtn',
+                              title: 'Outils cliniques',
+                              style: pickerOpen ? { background: '#eef1fb', color: 'var(--brand-primary, #1a5fd4)' } : undefined,
+                              onClick: function(e) {
+                                var r = e.currentTarget.getBoundingClientRect();
+                                if (pickerOpen) { setPickerOpen(false); } else { setPickerAnchor(r); setPickerOpen(true); }
+                              }
+                            }, React.createElement('span', { className: 'material-icons-outlined' }, 'handyman'))
+                          : null,
                         toolOpen
                           ? React.createElement('button', { className: 'ct-chip', onClick: toggleTool },
                               React.createElement('span', { className: 'material-icons-outlined' }, 'medical_information'),

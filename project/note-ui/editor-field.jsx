@@ -1168,8 +1168,11 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
 
   function filterSlash(q) {
     const t = (q || '').toLowerCase().trim();
-    if (!t) return window.NOTE_DATA.SLASH_ITEMS.filter((it) => !it.hideWhenEmpty);
-    return window.NOTE_DATA.SLASH_ITEMS.filter((it) => it.title.toLowerCase().includes(t) || (it.kbd && it.kbd.includes(t)));
+    const items = window.__SHOW_CLINICAL_TOOLS === false
+      ? window.NOTE_DATA.SLASH_ITEMS.filter((it) => !it.ctPicker)
+      : window.NOTE_DATA.SLASH_ITEMS;
+    if (!t) return items.filter((it) => !it.hideWhenEmpty);
+    return items.filter((it) => it.title.toLowerCase().includes(t) || (it.kbd && it.kbd.includes(t)));
   }
 
   // ---------------------------------------------------------

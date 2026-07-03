@@ -184,7 +184,8 @@
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "doctorName": "Véronique Charland",
-  "diagStyle": "actuel"
+  "diagStyle": "actuel",
+  "showClinicalTools": true
 } /*EDITMODE-END*/;
 
 function App() {
@@ -252,7 +253,8 @@ function App() {
               completeRef={noteCompleteRef}
               doctorName={t.doctorName}
               institution="Clinique du Centre-ville"
-              smartActive={smartActive} />
+              smartActive={smartActive}
+              showClinicalTools={t.showClinicalTools} />
             <NotesList doctorName={t.doctorName} extraNotes={completedNotes} />
             {noteOpen &&
             <div className="note-footer" style={{ gap: "8px", borderRadius: "16px 16px 16px 1px", padding: "16px" }}>
@@ -319,6 +321,9 @@ function App() {
       <TweaksPanel title="Tweaks">
         <TweakSection label="Médecin" />
         <TweakText label="Nom du médecin" value={t.doctorName} onChange={(v) => setTweak("doctorName", v)} />
+        <TweakSection label="Général" />
+        <TweakToggle label="Outils cliniques" value={t.showClinicalTools !== false}
+                     onChange={(v) => setTweak('showClinicalTools', v)} />
         <TweakSection label="Diagnostics" />
         <TweakRadio label="Style de région"
                     value={t.diagStyle || 'actuel'}
