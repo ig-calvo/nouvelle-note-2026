@@ -1974,11 +1974,16 @@ function searchCIM10(query) {
   if (!data || !query || query.trim().length < 2) return [];
   const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const q = norm(query.trim());
-  const results = [];
-  for (let i = 0; i < data.length && results.length < 8; i++) {
-    if (norm(data[i].libelle).includes(q)) results.push(data[i]);
+  // Catégories génériques (parapluie) d'abord — plus rapides à repérer et
+  // suffisantes pour la majorité des consultations de médecine familiale ;
+  // les codes précis restent juste en dessous pour qui en a besoin.
+  const generic = [];
+  const specific = [];
+  for (let i = 0; i < data.length; i++) {
+    if (!norm(data[i].libelle).includes(q)) continue;
+    (data[i].generic ? generic : specific).push(data[i]);
   }
-  return results;
+  return generic.concat(specific).slice(0, 8);
 }
 
 // ---------------------------------------------------------
@@ -2014,21 +2019,33 @@ function DiagnosticDropdown({ position, query, suggestions, activeIndex, onPickS
         <>
           <div style={{ height: 1, background: '#e8ecf5', margin: '0 12px' }} />
           <div style={{ padding: '4px 0 6px' }}>
-            {suggestions.map((s, i) => (
-              <div
-                key={s.code}
-                onMouseDown={(e) => { e.preventDefault(); if (onPickSuggestion) onPickSuggestion(s.libelle); }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '6px 16px', cursor: 'pointer',
-                  background: i === activeIndex ? '#eef3fb' : 'transparent'
-                }}
-              >
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#1a5fd4', minWidth: 44, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{s.code}</span>
-                <span style={{ fontSize: 13, color: 'rgba(0,0,0,0.82)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.libelle}</span>
-                {i === activeIndex && <kbd style={{ background: '#f0f0f8', border: '1px solid #d0d0e0', borderRadius: 3, padding: '1px 5px', fontSize: 11, color: '#888', flexShrink: 0 }}>↵</kbd>}
-              </div>
-            ))}
+            {suggestions.map((s, i) => {
+              const showDivider = i > 0 && suggestions[i - 1].generic && !s.generic;
+              return (
+                <React.Fragment key={s.code + '-' + i}>
+                  {showDivider && (
+                    <div style={{ padding: '6px 16px 4px', fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', color: 'rgba(0,0,0,0.35)', textTransform: 'uppercase' }}>
+                      Codes précis
+                    </div>
+                  )}
+                  <div
+                    onMouseDown={(e) => { e.preventDefault(); if (onPickSuggestion) onPickSuggestion(s.libelle); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '6px 16px', cursor: 'pointer',
+                      background: i === activeIndex ? '#eef3fb' : 'transparent'
+                    }}
+                  >
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, minWidth: 44, flexShrink: 0,
+                      color: s.generic ? '#6967d1' : '#1a5fd4', fontVariantNumeric: 'tabular-nums'
+                    }}>{s.generic ? 'Général' : s.code}</span>
+                    <span style={{ fontSize: 13, color: 'rgba(0,0,0,0.82)', fontWeight: s.generic ? 600 : 400, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.libelle}</span>
+                    {i === activeIndex && <kbd style={{ background: '#f0f0f8', border: '1px solid #d0d0e0', borderRadius: 3, padding: '1px 5px', fontSize: 11, color: '#888', flexShrink: 0 }}>↵</kbd>}
+                  </div>
+                </React.Fragment>
+              );
+            })}
           </div>
         </>
       )}
