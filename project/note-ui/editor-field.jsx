@@ -1120,6 +1120,23 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
     }
     if (it.rxSearch || it.orderSearch) { enterOrderMode(it.kbd || 'rx'); return; }
     if (it.diagnosticEntry) { enterDiagnosticMode(''); return; }
+    if (it.noteTemplate) {
+      const s = slashStateRef.current;
+      if (s) {
+        q.deleteText(s.startIndex, s.query.length + 1, 'silent');
+        slashFmtRef.current = null;
+        // Sync le contenu vidé vers le parent AVANT de dispatcher — le
+        // gabarit décide "remplacer vs ajouter" d'après l'état des sections,
+        // qui doit donc déjà refléter la suppression du "/virus" tapé.
+        const stored = deltaToStored(q.getContents());
+        lastStoredRef.current = stored;
+        onChange(stored);
+      }
+      setSlash(null); slashStateRef.current = null;
+      setFuncMenu(null);
+      window.dispatchEvent(new CustomEvent('note:apply-template', { detail: { key: it.noteTemplate } }));
+      return;
+    }
     if (it.addSection) {
       const s = slashStateRef.current;
       if (s) {

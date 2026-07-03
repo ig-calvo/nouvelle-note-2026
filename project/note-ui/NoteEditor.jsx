@@ -87,6 +87,29 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doct
     return function() { window.removeEventListener('ct-picker-open', onPickerOpen); };
   }, []);
 
+  // Gabarit de note (/virus, /itu, /periodique — editor-data.jsx NOTE_TEMPLATES) :
+  // règle structure + sections + outil clinique en un geste. Note vierge →
+  // les sections du gabarit remplacent les sections par défaut ; note déjà
+  // amorcée → elles s'ajoutent à la suite pour ne rien écraser.
+  React.useEffect(function() {
+    function onApplyTemplate(e) {
+      var key = e.detail && e.detail.key;
+      var tpl = (window.NOTE_DATA.NOTE_TEMPLATES || []).find(function(t) { return t.key === key; });
+      if (!tpl) return;
+      setSections(function(secs) {
+        var isBlank = secs.every(function(s) { return !s.content || !s.content.trim(); });
+        var tplSections = (tpl.sections || []).map(function(s, i) {
+          return { id: 'sec-' + Date.now() + '-' + i, title: s.title, content: s.content || '' };
+        });
+        return isBlank ? tplSections : secs.concat(tplSections);
+      });
+      setRaison(function(prev) { return prev && prev.trim() ? prev : (tpl.raison || ''); });
+      if (tpl.tool === 'itu') setToolOpen(true);
+    }
+    window.addEventListener('note:apply-template', onApplyTemplate);
+    return function() { window.removeEventListener('note:apply-template', onApplyTemplate); };
+  }, []);
+
   // Dispatch chip counts whenever chips or sections change (drives footer counters).
   // Diagnostics are counted from the {{DIAG:..}} region markers in section content.
   React.useEffect(function() {

@@ -611,6 +611,15 @@ const SLASH_ITEMS = [
     addSection: true },
   { key: 'outils-cliniques', section: 'Structure', icon: 'handyman', title: 'Outils cliniques', desc: 'Score, calculatrice, outil clinique…', kbd: '',
     ctPicker: true, noKbd: true },
+  // ── GABARITS DE NOTE ─────────────────────────────────────
+  // Un niveau au-dessus des gabarits de section / outil clinique : règle
+  // structure + sections + outil clinique associé en un seul geste.
+  { key: 'tpl-virus', section: 'Gabarits de note', icon: 'coronavirus', title: 'Syndrome viral / IVRS', desc: 'Histoire, examen, conclusion', kbd: 'virus',
+    noteTemplate: 'virus' },
+  { key: 'tpl-itu', section: 'Gabarits de note', icon: 'medical_information', title: 'Infection urinaire', desc: 'Structure + outil clinique ITU', kbd: 'itu',
+    noteTemplate: 'itu' },
+  { key: 'tpl-periodique', section: 'Gabarits de note', icon: 'event_repeat', title: 'Examen périodique', desc: 'Antécédents, examen, conclusion', kbd: 'periodique',
+    noteTemplate: 'periodique' },
   // ── FONCTIONS ────────────────────────────────────────────
   { key: 'add-file', section: 'Fonctions', icon: 'upload_file', title: 'Ajouter des fichiers', desc: 'PDF, image depuis ordinateur…', kbd: 'Alt+A',
     kbdNoSlash: true, fileAction: true },
@@ -640,6 +649,44 @@ const SLASH_ITEMS = [
     hideWhenEmpty: true,
     template: { type: 'problem', label: 'Problème', text: 'Problème',
       details: { name: '', severity: 'Modéré', since: "Aujourd'hui", notes: '' } } },
+];
+
+// ── GABARITS DE NOTE ─────────────────────────────────────────
+// Déclenchés par les entrées "Gabarits de note" ci-dessus (/virus, /itu,
+// /periodique). Inspirés des types de notes communs déjà présents dans
+// le picker d'outils cliniques et l'Assistant IA.
+const NOTE_TEMPLATES = [
+  {
+    key: 'virus', name: 'Syndrome viral / IVRS',
+    raison: 'Symptômes de rhume / syndrome viral',
+    sections: [
+      { title: 'Histoire de la maladie actuelle',
+        content: 'Depuis : \nSymptômes : \nDrapeaux rouges (absents) : dyspnée, douleur thoracique, confusion, incapacité à s’hydrater' },
+      { title: 'Examen physique',
+        content: 'Apyrétique / fébrile (T°) : \nAuscultation pulmonaire : \nOropharynx / tympans : ' },
+      { title: 'Conclusion', content: 'Impression : \nPlan : ' },
+    ],
+  },
+  {
+    key: 'itu', name: 'Infection urinaire',
+    raison: 'Symptômes urinaires',
+    sections: [
+      { title: 'Détails de la consultation', content: '' },
+      { title: 'Conclusion', content: 'Impression : \nPlan : ' },
+    ],
+    tool: 'itu',
+  },
+  {
+    key: 'periodique', name: 'Examen périodique',
+    raison: 'Examen médical périodique',
+    sections: [
+      { title: 'Antécédents et revue des systèmes',
+        content: 'Antécédents personnels : \nMédication actuelle : \nAllergies : \nHabitudes de vie : \nRevue des systèmes : sans particularité' },
+      { title: 'Examen physique',
+        content: 'Signes vitaux : TA _/_, pouls _, poids _ kg, IMC _\nExamen général : ' },
+      { title: 'Conclusion', content: 'Impression : Bonne santé générale.\nPlan : ' },
+    ],
+  },
 ];
 
 const PATIENT = {
@@ -697,6 +744,6 @@ const SCENARIOS = [
     hint: 'Cliquez sur un chip pour modifier les détails.' },
 ];
 
-window.NOTE_DATA = { ENTITY_TYPES, RECOGNIZERS, MED_CATALOG, SLASH_ITEMS, PATIENT, PROBLEMS, VITALS, RESULTS_RECENT, SCENARIOS,
+window.NOTE_DATA = { ENTITY_TYPES, RECOGNIZERS, MED_CATALOG, SLASH_ITEMS, NOTE_TEMPLATES, PATIENT, PROBLEMS, VITALS, RESULTS_RECENT, SCENARIOS,
   RX_FAVS, RX_ITEMS, PATIENT_MEDS, searchRx, toggleRxFav, deriveRx,
   ORDER_DEFS, orderKindForKbd, searchOrder, toggleOrderFav, deriveLabRx, deriveImgRx, deriveRefRx };
