@@ -138,12 +138,14 @@ function renderLines(lines, chips, keyPrefix) {
 }
 
 const RO_DIAG_OPEN = /^\{\{DIAG:([A-Za-z0-9_-]+)\|([^}]*)\}\}$/;
+const RO_REF_OPEN = /^\{\{REF:([^|]*)\|([^}]*)\}\}$/;
 
 // Read-only section renderer: walks lines, grouping {{DIAG:..}}…{{/DIAG}}
-// regions into blue callout blocks; everything else is normal text + chips.
+// regions into blue callout blocks and {{REF:..}} lines into citation
+// blocks; everything else is normal text + chips.
 function SectionContent({ content, chips }) {
   var lines = (content || '').split('\n');
-  var blocks = [];          // {type:'text', lines} | {type:'diag', name, lines}
+  var blocks = [];          // {type:'text', lines} | {type:'diag', name, lines} | {type:'ref', source, text}
   var textRun = [];
   var cur = null;
   function flushText() { if (textRun.length) { blocks.push({ type: 'text', lines: textRun }); textRun = []; } }
@@ -158,6 +160,15 @@ function SectionContent({ content, chips }) {
       return;
     }
     if (line === '{{/DIAG}}') { cur = null; return; }
+    var mr = RO_REF_OPEN.exec(line);
+    if (mr && !cur) {
+      flushText();
+      var src = '', txt = '';
+      try { src = decodeURIComponent(mr[1]); } catch (e) { src = mr[1]; }
+      try { txt = decodeURIComponent(mr[2]); } catch (e) { txt = mr[2]; }
+      blocks.push({ type: 'ref', source: src, text: txt });
+      return;
+    }
     if (cur) cur.lines.push(line); else textRun.push(line);
   });
   flushText();
@@ -167,6 +178,17 @@ function SectionContent({ content, chips }) {
       var hasContent = b.lines.some(function(l) { return l.trim() || /\{\{CHIP:/.test(l); });
       if (!hasContent) return null;
       return <div key={'tb-' + bi}>{renderLines(b.lines, chips, 'tb' + bi)}</div>;
+    }
+    if (b.type === 'ref') {
+      return (
+        <div key={'rb-' + bi} style={nlStyles.roRef}>
+          <div style={nlStyles.roRefHeader}>
+            <span className="material-icons-outlined" style={nlStyles.roRefIcon}>format_quote</span>
+            <span style={nlStyles.roRefSource}>Référence — {b.source}</span>
+          </div>
+          <div style={nlStyles.roRefBody}>{b.text.split('\n').map(function(l, li) { return <React.Fragment key={li}>{li > 0 && <br />}{l}</React.Fragment>; })}</div>
+        </div>
+      );
     }
     return (
       <div key={'db-' + bi} style={nlStyles.roDiag}>
@@ -188,6 +210,34 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
   ];
   const [openNotes, setOpenNotes] = React.useState({});
   const [activeFilters, setActiveFilters] = React.useState(new Set());
+  const [refButton, setRefButton] = React.useState(null);
+
+  // Sélectionner du texte dans une note complétée → « Référencer dans la
+  // note » (bouton flottant). data-ref-source (posé sur .body ci-dessous)
+  // porte l'auteur + la date de la note d'origine, quel que soit l'endroit
+  // du texte sélectionné (détails, section étoilée, conclusion…).
+  React.useEffect(function() {
+    function onMouseUp() {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) { setRefButton(null); return; }
+      const text = sel.toString().trim();
+      if (!text) { setRefButton(null); return; }
+      const anchorEl = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+      const wrap = anchorEl && anchorEl.closest && anchorEl.closest('[data-ref-source]');
+      if (!wrap) { setRefButton(null); return; }
+      const rect = sel.getRangeAt(0).getBoundingClientRect();
+      setRefButton({ text: text, source: wrap.getAttribute('data-ref-source'), top: rect.top, left: rect.left + rect.width / 2 });
+    }
+    document.addEventListener('mouseup', onMouseUp);
+    return function() { document.removeEventListener('mouseup', onMouseUp); };
+  }, []);
+
+  function addReference() {
+    if (!refButton) return;
+    window.dispatchEvent(new CustomEvent('note:add-reference', { detail: { text: refButton.text, source: refButton.source } }));
+    setRefButton(null);
+    window.getSelection().removeAllRanges();
+  }
 
   // Épisode de soin : notes distinctes (chacune garde son propre timestamp)
   // reliées par un episodeId commun — ex. consultation puis retour après une
@@ -269,7 +319,7 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
             </div>
 
             {/* Body */}
-            <div style={nlStyles.body}>
+            <div style={nlStyles.body} data-ref-source={n.author + ' — ' + n.date}>
               {/* Header row */}
               <div style={nlStyles.bodyHead}>
                 <div>
@@ -390,6 +440,15 @@ function NotesList({ doctorName = "Véronique Charland", extraNotes = [] }) {
           </div>
         );
       })}
+
+      {refButton &&
+        <button
+          style={{ ...nlStyles.refBtn, top: refButton.top - 42, left: refButton.left }}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={addReference}>
+          <span className="material-icons-outlined" style={{ fontSize: 16 }}>format_quote</span>
+          Référencer dans la note
+        </button>}
     </div>
   );
 }
@@ -493,6 +552,13 @@ const nlStyles = {
   detailsText: {
     fontSize: 15, color: "rgba(0,0,0,0.82)", lineHeight: 1.6,
   },
+  refBtn: {
+    position: 'fixed', transform: 'translateX(-50%)', zIndex: 500,
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    background: '#25245E', color: '#fff', border: 0, borderRadius: 8,
+    padding: '8px 14px', font: "500 13px 'Inter', sans-serif", cursor: 'pointer',
+    boxShadow: '0 6px 18px rgba(0,0,0,0.22)', whiteSpace: 'nowrap',
+  },
   starredRow: { margin: '2px 0 12px', border: '1px solid #f5d896', borderRadius: 10, overflow: 'hidden', background: '#fffaf0' },
   starredHeader: { display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px', background: '#fef3dd' },
   starredIcon: { fontSize: 15, color: '#f59e0b' },
@@ -513,6 +579,11 @@ const nlStyles = {
   roDiagIcon: { fontSize: 16, color: '#1a5fd4' },
   roDiagName: { fontSize: 14, fontWeight: 600, color: '#1a5fd4' },
   roDiagBody: { background: '#f5f9ff', padding: '8px 12px', fontSize: 15, color: 'rgba(0,0,0,0.82)', lineHeight: 1.6 },
+  roRef: { margin: '8px 0', padding: '9px 14px', borderLeft: '3px solid #b0a99a', background: '#faf9f6', borderRadius: '0 8px 8px 0' },
+  roRefHeader: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 },
+  roRefIcon: { fontSize: 15, color: '#8a7f68' },
+  roRefSource: { fontSize: 11.5, fontWeight: 600, color: '#756b56', letterSpacing: '0.02em' },
+  roRefBody: { fontSize: 14, fontStyle: 'italic', color: 'rgba(0,0,0,0.68)', lineHeight: 1.5 },
   conclLabelWrap: { marginTop: 4, marginBottom: 4 },
   conclLabel: {
     fontSize: 11, fontWeight: 500, letterSpacing: 0.8,

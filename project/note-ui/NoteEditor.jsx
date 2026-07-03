@@ -124,6 +124,30 @@ function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doct
     return function() { window.removeEventListener('note:apply-template', onApplyTemplate); };
   }, []);
 
+  // Référencer un passage sélectionné dans une note antérieure complétée
+  // (sélection + bouton flottant dans NotesList.jsx). Ajouté à la 1re
+  // section — même convention que l'Assistant IA (onAddToNote ci-dessous).
+  React.useEffect(function() {
+    function onAddReference(e) {
+      var detail = e.detail || {};
+      var text = (detail.text || '').trim();
+      if (!text) return;
+      var sentinel = '{{REF:' + encodeURIComponent(detail.source || '') + '|' + encodeURIComponent(text) + '}}';
+      setSections(function(secs) {
+        if (!secs.length) return secs;
+        return secs.map(function(s, i) {
+          if (i !== 0) return s;
+          var v = s.content;
+          var prefix = v && v.trim() ? v.replace(/\n*$/, '') + '\n' : '';
+          return Object.assign({}, s, { content: prefix + sentinel + '\n' });
+        });
+      });
+      if (onOpen) onOpen();
+    }
+    window.addEventListener('note:add-reference', onAddReference);
+    return function() { window.removeEventListener('note:add-reference', onAddReference); };
+  }, []);
+
   // Dispatch chip counts whenever chips or sections change (drives footer counters).
   // Diagnostics are counted from the {{DIAG:..}} region markers in section content.
   React.useEffect(function() {

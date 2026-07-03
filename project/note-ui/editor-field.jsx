@@ -294,6 +294,61 @@ function newDiagId() {return 'd' + _diagSeq++;}
 })();
 
 // ---------------------------------------------------------
+// Reference blot — passage cité depuis une note antérieure complétée
+// (sélection de texte dans NotesList.jsx → « Référencer dans la note »).
+// Bloc atomique (non composé ligne par ligne comme un diagnostic) : la
+// citation est insérée d'un bloc avec sa provenance, jamais éditée en
+// place — cohérent avec le fait qu'on cite un texte déjà signé ailleurs.
+// ---------------------------------------------------------
+(function registerReferenceBlot() {
+  if (window.__refBlotRegistered) return;
+  const BlockEmbed = Quill.import('blots/block/embed');
+
+  class ReferenceBlot extends BlockEmbed {
+    static blotName = 'reference';
+    static tagName = 'div';
+    static className = 'ql-ref-block';
+    static create(value) {
+      const node = super.create();
+      value = value || {};
+      node.setAttribute('contenteditable', 'false');
+      node.setAttribute('data-source', value.source || '');
+      node.setAttribute('data-text', value.text || '');
+      const hdr = document.createElement('div');
+      hdr.className = 'ql-ref-header';
+      const ic = document.createElement('span');
+      ic.className = 'material-symbols-outlined ql-ref-ic';
+      ic.textContent = 'format_quote';
+      hdr.appendChild(ic);
+      const src = document.createElement('span');
+      src.className = 'ql-ref-source';
+      src.textContent = 'Référence — ' + (value.source || '');
+      hdr.appendChild(src);
+      node.appendChild(hdr);
+      const body = document.createElement('div');
+      body.className = 'ql-ref-body';
+      (value.text || '').split('\n').forEach(function (line, i) {
+        if (i > 0) body.appendChild(document.createElement('br'));
+        body.appendChild(document.createTextNode(line));
+      });
+      node.appendChild(body);
+      return node;
+    }
+    static value(node) {
+      return { source: node.getAttribute('data-source') || '', text: node.getAttribute('data-text') || '' };
+    }
+    length() { return 1; }
+  }
+
+  Quill.register(ReferenceBlot, true);
+  const Scroll = Quill.import('blots/scroll');
+  if (Scroll.allowedChildren && Scroll.allowedChildren.indexOf(ReferenceBlot) === -1) {
+    Scroll.allowedChildren.push(ReferenceBlot);
+  }
+  window.__refBlotRegistered = true;
+})();
+
+// ---------------------------------------------------------
 // Convert stored value to Quill delta.
 // Stored format: flat string with inline "{{CHIP:cid}}" markers, plus
 // per-line diagnostic-region sentinels:
@@ -307,6 +362,7 @@ function newDiagId() {return 'd' + _diagSeq++;}
 // marker regex unambiguous (no '}' '|' '{' newline inside).
 // ---------------------------------------------------------
 const DIAG_OPEN_RE = /^\{\{DIAG:([A-Za-z0-9_-]+)\|([^}]*)\}\}$/;
+const REF_OPEN_RE = /^\{\{REF:([^|]*)\|([^}]*)\}\}$/;
 
 function storedToDelta(stored, chips) {
   const ops = [];
@@ -323,6 +379,14 @@ function storedToDelta(stored, chips) {
       continue;
     }
     if (line === '{{/DIAG}}') { curDiag = null; continue; }
+    const mr = REF_OPEN_RE.exec(line);
+    if (mr) {
+      let src = '', txt = '';
+      try { src = decodeURIComponent(mr[1]); } catch (e) { src = mr[1]; }
+      try { txt = decodeURIComponent(mr[2]); } catch (e) { txt = mr[2]; }
+      ops.push({ insert: { reference: { source: src, text: txt } } });
+      continue;
+    }
     // normal / body line: split on chip markers
     const parts = line.split(/(\{\{CHIP:[^}]+\}\})/g);
     for (const p of parts) {
@@ -356,6 +420,8 @@ function storedToDelta(stored, chips) {
     ops.push({ insert: '\n', attributes: { diagnostic: last.insert['diagnostic-header'].id } });
     ops.push({ insert: '\n' });
   } else if (last.insert === '\n' && last.attributes && last.attributes.diagnostic) {
+    ops.push({ insert: '\n' });
+  } else if (last.insert && last.insert.reference) {
     ops.push({ insert: '\n' });
   }
   return { ops };
@@ -403,6 +469,10 @@ function deltaToStored(delta) {
       if (buf) { recs.push({ type: 'line', text: buf, diag: null }); buf = ''; }
       const h = op.insert['diagnostic-header'];
       recs.push({ type: 'header', id: h.id || '', name: h.name || '' });
+    } else if (op.insert.reference) {
+      if (buf) { recs.push({ type: 'line', text: buf, diag: null }); buf = ''; }
+      const r = op.insert.reference;
+      recs.push({ type: 'ref', source: r.source || '', text: r.text || '' });
     }
     // transient embeds (orderbadge) are intentionally dropped
   }
@@ -416,6 +486,9 @@ function deltaToStored(delta) {
       if (cur != null) out.push('{{/DIAG}}');
       out.push('{{DIAG:' + r.id + '|' + encodeURIComponent(r.name) + '}}');
       cur = r.id;
+    } else if (r.type === 'ref') {
+      if (cur != null) { out.push('{{/DIAG}}'); cur = null; }
+      out.push('{{REF:' + encodeURIComponent(r.source) + '|' + encodeURIComponent(r.text) + '}}');
     } else {
       if (r.diag !== cur) {
         if (cur != null) { out.push('{{/DIAG}}'); cur = null; }
@@ -537,7 +610,7 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
       theme: 'snow',
       placeholder,
       modules: { toolbar: false, keyboard: { bindings: {} } },
-      formats: ['bold', 'italic', 'underline', 'strike', 'list', 'indent', 'header', 'blockquote', 'code-block', 'link', 'color', 'background', 'chip', 'slashcmd', 'orderbadge', 'diagnostic', 'diagnostic-header']
+      formats: ['bold', 'italic', 'underline', 'strike', 'list', 'indent', 'header', 'blockquote', 'code-block', 'link', 'color', 'background', 'chip', 'slashcmd', 'orderbadge', 'diagnostic', 'diagnostic-header', 'reference']
     });
     quillRef.current = q;
 
