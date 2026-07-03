@@ -17,6 +17,8 @@ const rxS = {
   ramq: { display: 'inline-flex', alignItems: 'center', gap: 3, font: "500 12px 'Inter', sans-serif", color: '#484c51', whiteSpace: 'nowrap' },
   alertChip: { display: 'inline-flex', alignItems: 'center', gap: 4, border: '1px solid #c3ccd5', borderRadius: 8, padding: '4px 8px', flexShrink: 0 },
   alertBand: { display: 'flex', alignItems: 'center', gap: 10, margin: '12px 18px 0', padding: '8px 14px', background: '#f8f7fd', border: '1px solid #c3ccd5', borderRadius: 8 },
+  pedsBand: { display: 'flex', alignItems: 'center', gap: 10, margin: '8px 18px 0', padding: '8px 14px', background: '#f5f0fa', border: '1px solid #d9c9ea', borderRadius: 8 },
+  pedsApply: { flexShrink: 0, border: '1px solid #8a5cb8', background: '#fff', color: '#8a5cb8', borderRadius: 6, padding: '6px 12px', font: "600 12px 'Inter',sans-serif", cursor: 'pointer' },
   closeBtn: { width: 36, height: 36, border: 0, background: 'transparent', borderRadius: 8, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#484c51', flexShrink: 0 },
   body: { padding: '16px 18px 4px', overflowY: 'auto', flex: '1 1 auto', minHeight: 0 },
   sec: { font: "700 11px 'Inter', sans-serif", letterSpacing: '0.7px', textTransform: 'uppercase', color: '#2e38a6', margin: '6px 0 16px' },
@@ -115,6 +117,15 @@ function ChipPopover({ chip, anchorRect, onClose, onSave, onRevert, onDelete }) 
 
   if (isRx) {
     const d = draft.details || {};
+    const pedsW = window.__PEDIATRIC_WEIGHT;
+    const peds = d.pedsDosing && pedsW ? d.pedsDosing : null;
+    let pedsCalc = null;
+    if (peds) {
+      const raw = peds.mgPerKg * pedsW.kg;
+      const rounded = Math.max(25, Math.round(raw / 25) * 25);
+      const capped = peds.maxMgPerDose ? Math.min(rounded, peds.maxMgPerDose) : rounded;
+      pedsCalc = { raw, suggested: capped, wasCapped: capped < rounded };
+    }
     return (
       <div className="popover" ref={ref} style={Object.assign({}, rxS.panel, { top: top, left: left, width: W })} role="dialog">
         <div style={rxS.head}>
@@ -127,9 +138,25 @@ function ChipPopover({ chip, anchorRect, onClose, onSave, onRevert, onDelete }) 
           <span className="material-icons-outlined" style={{ fontSize: 20, color: '#39604d', flexShrink: 0 }}>verified_user</span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
             <span style={{ font: "500 14px 'Inter',sans-serif", color: '#232428' }}>Aucune alerte</span>
-            <span style={{ font: "400 12px 'Inter',sans-serif", color: '#6b6f76' }}>Créatinine sérique : N/A&nbsp;&nbsp;·&nbsp;&nbsp;eGFR : N/A&nbsp;&nbsp;·&nbsp;&nbsp;Poids : N/A</span>
+            <span style={{ font: "400 12px 'Inter',sans-serif", color: '#6b6f76' }}>
+              Créatinine sérique : N/A&nbsp;&nbsp;·&nbsp;&nbsp;eGFR : N/A&nbsp;&nbsp;·&nbsp;&nbsp;
+              Poids : {pedsW ? pedsW.kg + ' kg (pesée du ' + pedsW.weighedOn + ')' : 'N/A'}
+            </span>
           </div>
         </div>
+        {peds &&
+          <div style={rxS.pedsBand}>
+            <span className="material-icons-outlined" style={{ fontSize: 20, color: '#8a5cb8', flexShrink: 0 }}>child_care</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, flex: 1 }}>
+              <span style={{ font: "500 13px 'Inter',sans-serif", color: '#232428' }}>
+                {peds.mgPerKg} mg/kg/dose × {pedsW.kg} kg = {Math.round(pedsCalc.raw)} mg → suggéré {pedsCalc.suggested} mg
+                {peds.freq ? ' ' + peds.freq : ''}
+                {pedsCalc.wasCapped ? ' (plafonné à la dose adulte)' : ''}
+              </span>
+              <span style={{ font: "400 12px 'Inter',sans-serif", color: '#6b6f76' }}>Dose max : {peds.maxMgPerDose} mg/dose — à valider cliniquement.</span>
+            </div>
+            <button type="button" style={rxS.pedsApply} onClick={() => up('dose', String(pedsCalc.suggested))}>Appliquer</button>
+          </div>}
         <div style={rxS.body}>
           <div style={rxS.sec}>Médicament et posologie</div>
           <div style={rxS.row}>

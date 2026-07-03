@@ -19,12 +19,19 @@ function scanDiagNames(sections) {
 }
 
 function NoteEditor({ isOpen, onOpen, onComplete, completeRef, smartActive, doctorName, institution, showClinicalTools = true,
-  startPoints = false, lastNote, onLinkEpisode, onDraftSaved, onSmartPick, saveDraftRef }) {
+  startPoints = false, lastNote, onLinkEpisode, onDraftSaved, onSmartPick, saveDraftRef, pediatricPatient = false }) {
   // Lu par editor-field.jsx (filterSlash) pour retirer l'entrée "Outils
   // cliniques" du menu slash sans faire dépendre editor-data.jsx d'une prop.
   React.useEffect(function() {
     window.__SHOW_CLINICAL_TOOLS = showClinicalTools;
   }, [showClinicalTools]);
+
+  // Lu par editor-popover.jsx (ChipPopover) pour calculer une dose pédiatrique
+  // suggérée (mg/kg) sans faire remonter tout le contexte patient jusqu'à la
+  // popover — même pattern que __SHOW_CLINICAL_TOOLS ci-dessus.
+  React.useEffect(function() {
+    window.__PEDIATRIC_WEIGHT = pediatricPatient ? { kg: 18.2, weighedOn: '12 juin 2026' } : null;
+  }, [pediatricPatient]);
 
   // Brouillons sauvegardés (« Continuer la note ») et lien d'épisode de soin
   // (« Depuis la dernière note ») — voir NoteStartCards.jsx pour l'UI et

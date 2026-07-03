@@ -188,7 +188,8 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "diagStyle": "actuel",
   "showClinicalTools": true,
   "portalActive": true,
-  "startPoints": false
+  "startPoints": false,
+  "pediatricPatient": false
 } /*EDITMODE-END*/;
 
 function App() {
@@ -283,7 +284,8 @@ function App() {
               onLinkEpisode={handleLinkEpisode}
               onDraftSaved={handleDraftSaved}
               onSmartPick={() => setSmartModal(true)}
-              saveDraftRef={noteSaveDraftRef} />
+              saveDraftRef={noteSaveDraftRef}
+              pediatricPatient={t.pediatricPatient} />
             <NotesList doctorName={t.doctorName} extraNotes={completedNotes} />
             {noteOpen &&
             <div className="note-footer" style={{ gap: "8px", borderRadius: "16px 16px 16px 1px", padding: "16px" }}>
@@ -359,6 +361,8 @@ function App() {
                      onChange={(v) => setTweak('portalActive', v)} />
         <TweakToggle label="Points de départ" value={t.startPoints === true}
                      onChange={(v) => setTweak('startPoints', v)} />
+        <TweakToggle label="Patient pédiatrique (poids)" value={t.pediatricPatient === true}
+                     onChange={(v) => setTweak('pediatricPatient', v)} />
         <TweakSection label="Diagnostics" />
         <TweakRadio label="Style de région"
                     value={t.diagStyle || 'actuel'}
