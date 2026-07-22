@@ -820,22 +820,46 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
           const listFor = (query) => isOrder
             ? flattenRxResults(window.NOTE_DATA.searchOrder(s0.kind, (query || '').trim()))
             : filterSlash(query);
+          // Médications au dossier : rangée d'actions navigable au clavier (← →).
+          const isActiveMed = (it) => !!(it && it.med && it.medStatus === 'active');
           if (e.key === 'Escape') {e.preventDefault();closeSlashMenu();return;}
           if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setSlash((s) => {const items = listFor(s.query);const ns = { ...s, activeIndex: Math.min(items.length - 1, s.activeIndex + 1) };slashStateRef.current = ns;return ns;});
+            // Changer de rangée réinitialise l'action sur « Renouveler ».
+            setSlash((s) => {const items = listFor(s.query);const ns = { ...s, activeIndex: Math.min(items.length - 1, s.activeIndex + 1), activeAction: 0 };slashStateRef.current = ns;return ns;});
             return;
           }
           if (e.key === 'ArrowUp') {
             e.preventDefault();
-            setSlash((s) => {const ns = { ...s, activeIndex: Math.max(0, s.activeIndex - 1) };slashStateRef.current = ns;return ns;});
+            setSlash((s) => {const ns = { ...s, activeIndex: Math.max(0, s.activeIndex - 1), activeAction: 0 };slashStateRef.current = ns;return ns;});
+            return;
+          }
+          if (isOrder && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+            // Menu ouvert : ← → appartiennent au menu, pas au texte. Sur une
+            // médication active au dossier, elles déplacent le focus entre
+            // Renouveler / Ajuster / Cesser ; sur les autres lignes on neutralise
+            // la touche pour éviter que le curseur quitte la requête (p. ex. qu'il
+            // saute à la ligne suivante).
+            e.preventDefault();
+            const items = listFor(s0.query);
+            if (isActiveMed(items[s0.activeIndex])) {
+              const dir = e.key === 'ArrowRight' ? 1 : -1;
+              setSlash((s) => {const na = Math.min(2, Math.max(0, (s.activeAction || 0) + dir));const ns = { ...s, activeAction: na };slashStateRef.current = ns;return ns;});
+            }
             return;
           }
           if (e.key === 'Enter' || (isOrder && e.key === 'Tab')) {
             e.preventDefault();
             const items = listFor(s0.query);
             const it = items[s0.activeIndex];
-            if (it) { isOrder ? insertOrderChip(it) : chooseSlashItem(it); }
+            if (it) {
+              if (isOrder) {
+                const action = isActiveMed(it) ? ['renouveler', 'ajuster', 'cesser'][s0.activeAction || 0] : undefined;
+                insertOrderChip(it, action);
+              } else {
+                chooseSlashItem(it);
+              }
+            }
             // Ensure Quill stays focused so user can type immediately after entering order/diagnostic mode
             setTimeout(function() { quillRef.current && quillRef.current.focus(); }, 0);
             return;
@@ -1830,7 +1854,8 @@ function EditorField({ id, placeholder, value, chips, onChange, onAddChip, onChi
         query={orderQuery}
         results={orderResults}
         activeIndex={slash.activeIndex}
-        onHover={(i) => setSlash((s) => {if (!s) return s;const ns = { ...s, activeIndex: i };slashStateRef.current = ns;return ns;})}
+        activeAction={slash.activeAction || 0}
+        onHover={(i) => setSlash((s) => {if (!s) return s;const ns = { ...s, activeIndex: i, activeAction: i === s.activeIndex ? (s.activeAction || 0) : 0 };slashStateRef.current = ns;return ns;})}
         onSelect={(it, action) => insertOrderChip(it, action)}
         onToggleFav={(k) => {window.NOTE_DATA.toggleOrderFav(orderKind, k);setFavBump((n) => n + 1);}}
         onClose={() => closeSlashMenu()} />

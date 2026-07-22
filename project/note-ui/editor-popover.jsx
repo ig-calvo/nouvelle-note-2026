@@ -472,7 +472,7 @@ function RxNameHighlight({ name, query }) {
     </>);
 }
 
-function RxMenu({ position, kind, def, query, results, activeIndex, onSelect, onHover, onToggleFav, onClose }) {
+function RxMenu({ position, kind, def, query, results, activeIndex, activeAction, onSelect, onHover, onToggleFav, onClose }) {
   const ref = useRefP(null);
   useEffectP(() => {
     function onDoc(e) { if (ref.current && !ref.current.contains(e.target)) onClose(); }
@@ -492,6 +492,10 @@ function RxMenu({ position, kind, def, query, results, activeIndex, onSelect, on
   sections.push([d.sections[1], results.frequents]);
   sections.push([d.sections[2], results.autres]);
   const total = profil.length + results.favoris.length + results.frequents.length + results.autres.length;
+  const kbdAction = activeAction || 0;
+  const activeItem = profil.concat(results.favoris, results.frequents, results.autres)[activeIndex];
+  const activeIsMed = activeItem && activeItem.med && activeItem.medStatus === 'active';
+  const enterVerb = activeIsMed ? ['Renouveler', 'Ajuster', 'Cesser'][kbdAction] : d.verb;
   let flat = -1;
 
   return (
@@ -508,6 +512,7 @@ function RxMenu({ position, kind, def, query, results, activeIndex, onSelect, on
               const idx = flat;
               const fav = favSet.has(it.key);
               const isActiveMed = it.med && it.medStatus === 'active';
+              const kbdOn = idx === activeIndex ? kbdAction : -1;
               return (
                 <div key={it.key} role="option" aria-selected={idx === activeIndex}
                   className={'rx-item' + (idx === activeIndex ? ' is-active' : '')}
@@ -524,17 +529,17 @@ function RxMenu({ position, kind, def, query, results, activeIndex, onSelect, on
                     {it.med
                       ? (isActiveMed
                           ? <span className="rx-med-actions">
-                              <button type="button" className="rx-med-btn" title="Renouveler — même posologie"
+                              <button type="button" className={'rx-med-btn' + (kbdOn === 0 ? ' is-kbd' : '')} title="Renouveler — même posologie"
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={(e) => { e.stopPropagation(); onSelect(it, 'renouveler'); }}>
                                 <span className="material-icons-outlined">refresh</span>
                               </button>
-                              <button type="button" className="rx-med-btn" title="Ajuster la posologie"
+                              <button type="button" className={'rx-med-btn' + (kbdOn === 1 ? ' is-kbd' : '')} title="Ajuster la posologie"
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={(e) => { e.stopPropagation(); onSelect(it, 'ajuster'); }}>
                                 <span className="material-icons-outlined">tune</span>
                               </button>
-                              <button type="button" className="rx-med-btn rx-med-btn--stop" title="Cesser"
+                              <button type="button" className={'rx-med-btn rx-med-btn--stop' + (kbdOn === 2 ? ' is-kbd' : '')} title="Cesser"
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={(e) => { e.stopPropagation(); onSelect(it, 'cesser'); }}>
                                 <span className="material-icons-outlined">block</span>
@@ -561,7 +566,8 @@ function RxMenu({ position, kind, def, query, results, activeIndex, onSelect, on
       </div>
       <div className="rx-menu__foot">
         <span><kbd>↑ ↓</kbd> naviguer</span>
-        <span><kbd>↵</kbd> {d.verb}</span>
+        {activeIsMed && <span><kbd>← →</kbd> action</span>}
+        <span><kbd>↵</kbd> {enterVerb}</span>
         <span><kbd>Esc</kbd> annuler</span>
       </div>
     </div>);

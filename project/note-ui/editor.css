@@ -445,6 +445,9 @@
 .rx-med-btn:hover { background: rgba(25,117,209,0.10); color: #1975d1; }
 .rx-med-btn .material-icons-outlined { font-size: 19px; }
 .rx-med-btn--stop:hover { background: rgba(211,47,47,0.10); color: #d32f2f; }
+/* Focus clavier (← →) sur une action de médication au dossier */
+.rx-med-btn.is-kbd { background: rgba(25,117,209,0.12); color: #1975d1; box-shadow: 0 0 0 2px rgba(25,117,209,0.45); }
+.rx-med-btn--stop.is-kbd { background: rgba(211,47,47,0.12); color: #d32f2f; box-shadow: 0 0 0 2px rgba(211,47,47,0.45); }
 .rx-empty { padding: 18px 16px; font-size: 13px; color: var(--fg-3); }
 .rx-menu__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 12px; font-size: 10px; color: var(--fg-3); border-top: 1px solid var(--border-subtle); background: var(--bg-subtle); }
 .rx-menu__foot kbd { font-family: var(--font-mono); font-size: 9px; background: var(--surface-2); border: 1px solid var(--border-subtle); padding: 1px 4px; border-radius: 3px; color: var(--fg-2); font-weight: 600; }
